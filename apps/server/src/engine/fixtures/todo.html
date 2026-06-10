@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Tiny Todo</title>
+  </head>
+  <body>
+    <h1>Tiny Todo</h1>
+    <input id="new-todo" type="text" placeholder="What needs doing?" aria-label="New todo" />
+    <button id="add" type="button">Add todo</button>
+    <ul id="list" aria-label="Todo list"></ul>
+    <script>
+      const input = document.getElementById("new-todo");
+      const list = document.getElementById("list");
+      const add = () => {
+        const text = input.value.trim();
+        if (!text) return;
+        const item = document.createElement("li");
+        item.textContent = text;
+        list.appendChild(item);
+        input.value = "";
+        console.log("added todo: " + text);
+      };
+      document.getElementById("add").addEventListener("click", add);
+      input.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") add();
+      });
+    </script>
+  </body>
+</html>

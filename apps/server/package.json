@@ -12,10 +12,14 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
+    "@cucumber/gherkin": "^40.0.0",
+    "@cucumber/messages": "^33.0.2",
     "@effect/platform-node": "catalog:",
+    "@github/copilot-sdk": "^1.0.1",
     "@greenlight/contracts": "workspace:*",
     "@greenlight/shared": "workspace:*",
-    "effect": "catalog:"
+    "effect": "catalog:",
+    "playwright": "~1.60.0"
   },
   "devDependencies": {
     "@greenlight/client-runtime": "workspace:*",
