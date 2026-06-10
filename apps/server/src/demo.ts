@@ -12,10 +12,10 @@ import * as Layer from "effect/Layer";
 
 import { RunId, type ParsedFeature, type RunEvent } from "@greenlight/contracts";
 
-import { BrowserServiceLive } from "./browser/BrowserService.ts";
-import { CopilotService, CopilotServiceLive } from "./copilot/CopilotService.ts";
-import { GherkinService, GherkinServiceLive } from "./gherkin/GherkinService.ts";
-import { RunEngine, RunEngineLive } from "./engine/RunEngine.ts";
+import { CopilotService } from "./copilot/CopilotService.ts";
+import { GherkinService } from "./gherkin/GherkinService.ts";
+import { RunEngine } from "./engine/RunEngine.ts";
+import { servicesLayer } from "./server.ts";
 
 const color = {
   green: (text: string) => `[32m${text}[0m`,
@@ -157,10 +157,4 @@ export const demoProgram = (options: DemoOptions) =>
     }
   });
 
-export const demoLayer = Layer.mergeAll(
-  GherkinServiceLive,
-  CopilotServiceLive,
-  RunEngineLive.pipe(
-    Layer.provide(Layer.mergeAll(BrowserServiceLive, CopilotServiceLive, GherkinServiceLive)),
-  ),
-);
+export const demoLayer = servicesLayer;

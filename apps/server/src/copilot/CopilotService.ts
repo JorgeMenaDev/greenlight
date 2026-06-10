@@ -49,7 +49,8 @@ export interface AgentSession {
 }
 
 export interface CopilotServiceShape {
-  readonly authStatus: Effect.Effect<CopilotAuthState, CopilotError>;
+  /** Never fails: auth problems come back as `state: "error"`. */
+  readonly authStatus: Effect.Effect<CopilotAuthState>;
   readonly listModels: Effect.Effect<
     ReadonlyArray<{ readonly id: string; readonly name: string }>,
     CopilotError

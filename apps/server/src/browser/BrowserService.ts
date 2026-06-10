@@ -7,7 +7,11 @@
  *
  * @module BrowserService
  */
+import * as NodeFsSync from "node:fs";
+
 import { chromium, type Browser, type Page } from "playwright";
+
+import type { BrowserStatus } from "@greenlight/contracts";
 
 import * as Context from "effect/Context";
 import * as Data from "effect/Data";
@@ -33,6 +37,7 @@ export interface BrowserServiceShape {
    * the caller's scope.
    */
   readonly acquirePage: Effect.Effect<Page, BrowserError, Scope.Scope>;
+  readonly status: Effect.Effect<BrowserStatus>;
 }
 
 export class BrowserService extends Context.Service<BrowserService, BrowserServiceShape>()(
@@ -102,7 +107,22 @@ export const make = Effect.gen(function* () {
     });
   });
 
-  return { acquirePage } satisfies BrowserServiceShape;
+  const status: BrowserServiceShape["status"] = Effect.sync(() => {
+    try {
+      if (NodeFsSync.existsSync(chromium.executablePath())) {
+        return { state: "ready" } satisfies BrowserStatus;
+      }
+    } catch {
+      // executablePath throws when no browser is registered.
+    }
+    return {
+      state: "missing",
+      detail:
+        "No Playwright chromium found. Run `npx playwright install chromium` or install Google Chrome.",
+    } satisfies BrowserStatus;
+  });
+
+  return { acquirePage, status } satisfies BrowserServiceShape;
 });
 
 export const BrowserServiceLive = Layer.effect(BrowserService, make);

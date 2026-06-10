@@ -9,9 +9,6 @@
  *
  * @module RunEngine
  */
-import * as NodeFs from "node:fs/promises";
-import * as NodePath from "node:path";
-
 import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
@@ -19,7 +16,6 @@ import * as Layer from "effect/Layer";
 import * as Ref from "effect/Ref";
 
 import {
-  EvidenceId,
   type EvidenceRef,
   type ParsedScenario,
   type PickleId,
@@ -33,7 +29,7 @@ import {
 
 import { BrowserService } from "../browser/BrowserService.ts";
 import { CopilotService } from "../copilot/CopilotService.ts";
-import { ServerConfig } from "../config.ts";
+import { EvidenceStore } from "../evidence/EvidenceStore.ts";
 import { makePlaywrightTools, type VerdictSlot } from "./PlaywrightTools.ts";
 import { executeStep } from "./StepAgent.ts";
 import { SYSTEM_MESSAGE } from "./prompts.ts";
@@ -71,7 +67,7 @@ const pendingSteps = (scenario: ParsedScenario): Array<StepResult> =>
 export const make = Effect.gen(function* () {
   const browser = yield* BrowserService;
   const copilot = yield* CopilotService;
-  const config = yield* ServerConfig;
+  const evidenceStore = yield* EvidenceStore;
 
   const executeRun: RunEngineShape["executeRun"] = (options) =>
     Effect.gen(function* () {
@@ -90,14 +86,12 @@ export const make = Effect.gen(function* () {
           yield* options.onEvent({ ...event, runId: options.runId, seq, at } as RunEvent);
         });
 
-      const runEvidenceDir = NodePath.join(config.evidenceDir, options.runId);
-      const evidenceCounter = { next: 0 };
-      const saveScreenshot = async (label: string, data: Uint8Array): Promise<string> => {
-        const id = `${options.runId}-${evidenceCounter.next++}`;
-        await NodeFs.mkdir(runEvidenceDir, { recursive: true });
-        await NodeFs.writeFile(NodePath.join(runEvidenceDir, `${id}.png`), data);
-        return id;
-      };
+      // Promise bridge for the tool handlers (the Copilot SDK calls them
+      // as plain async functions outside any fiber).
+      const saveScreenshot = (label: string, data: Uint8Array): Promise<string> =>
+        Effect.runPromise(evidenceStore.saveScreenshot(options.runId, label, data)).then(
+          (ref) => ref.id,
+        );
       const createdAt = yield* nowIso;
       const scenarioResults: Array<ScenarioResult> = options.scenarios.map((scenario) => ({
         pickleId: scenario.pickleId,
@@ -207,19 +201,17 @@ export const make = Effect.gen(function* () {
               // Engine-captured screenshot: evidence even when the agent
               // didn't take one (or lied).
               const evidence: Array<EvidenceRef> = [];
-              const screenshot = yield* Effect.promise(() =>
-                page
-                  .screenshot({ type: "png" })
-                  .then((data) => saveScreenshot(`step-${stepIndex + 1}`, data))
-                  .catch(() => undefined),
+              const screenshotData = yield* Effect.promise(() =>
+                page.screenshot({ type: "png" }).catch(() => undefined),
               );
-              if (screenshot !== undefined) {
-                evidence.push({
-                  id: EvidenceId.make(screenshot),
-                  kind: "screenshot",
-                  label: `After step ${stepIndex + 1}`,
-                  createdAt: yield* nowIso,
-                });
+              if (screenshotData !== undefined) {
+                evidence.push(
+                  yield* evidenceStore.saveScreenshot(
+                    options.runId,
+                    `After step ${stepIndex + 1}`,
+                    screenshotData,
+                  ),
+                );
               }
 
               const finishedAt = yield* nowIso;
