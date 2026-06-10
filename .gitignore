@@ -1,0 +1,10 @@
+node_modules/
+dist/
+dist-electron/
+*.tsbuildinfo
+.DS_Store
+*.log
+.env
+.env.local
+coverage/
+release/

@@ -1,0 +1,26 @@
+{
+  "name": "@greenlight/server",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "greenlight-server": "./dist/bin.mjs"
+  },
+  "scripts": {
+    "dev": "node --watch src/bin.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@effect/platform-node": "catalog:",
+    "@greenlight/contracts": "workspace:*",
+    "@greenlight/shared": "workspace:*",
+    "effect": "catalog:"
+  },
+  "devDependencies": {
+    "@greenlight/client-runtime": "workspace:*",
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

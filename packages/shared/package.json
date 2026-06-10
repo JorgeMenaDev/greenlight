@@ -1,0 +1,28 @@
+{
+  "name": "@greenlight/shared",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./Net": {
+      "types": "./src/Net.ts",
+      "import": "./src/Net.ts"
+    },
+    "./DrainableWorker": {
+      "types": "./src/DrainableWorker.ts",
+      "import": "./src/DrainableWorker.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "effect": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

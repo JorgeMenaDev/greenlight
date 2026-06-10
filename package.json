@@ -1,0 +1,25 @@
+{
+  "name": "@greenlight/monorepo",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev:server": "pnpm --filter @greenlight/server dev",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "build": "pnpm -r build",
+    "lint": "oxlint",
+    "fmt": "prettier --write .",
+    "fmt:check": "prettier --check ."
+  },
+  "devDependencies": {
+    "@effect/language-service": "latest",
+    "@types/node": "catalog:",
+    "oxlint": "^1.0.0",
+    "prettier": "^3.6.0",
+    "typescript": "catalog:"
+  },
+  "engines": {
+    "node": ">=22.18.0"
+  },
+  "packageManager": "pnpm@10.28.2"
+}
