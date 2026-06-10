@@ -98,9 +98,9 @@ Toward v1:
 - [x] M0 — monorepo scaffold + walking skeleton
 - [x] M1 — headless engine vertical slice (`demo` command)
 - [x] M2 — persistence + full RPC surface
-- [ ] M3 — web renderer (run UI, live step feed, evidence viewer)
-- [ ] M4 — Electron desktop shell
-- [ ] M5 — onboarding + packaging
+- [x] M3 — web renderer (run UI, live step feed, evidence viewer)
+- [x] M4 — Electron desktop shell
+- [x] M5 — onboarding + packaging
 - [ ] M6 — OSS polish
 
 ## License
