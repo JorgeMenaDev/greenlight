@@ -1,0 +1,23 @@
+{
+  "name": "@greenlight/desktop",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "main": "dist-electron/main.cjs",
+  "scripts": {
+    "build": "tsdown",
+    "dev": "GREENLIGHT_DESKTOP_DEV=1 tsdown && GREENLIGHT_DESKTOP_DEV=1 electron .",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@effect/platform-node": "catalog:",
+    "@greenlight/shared": "workspace:*",
+    "effect": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "electron": "42.4.0",
+    "tsdown": "0.22.2",
+    "typescript": "catalog:"
+  }
+}

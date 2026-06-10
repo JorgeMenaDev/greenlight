@@ -4,6 +4,8 @@
   "type": "module",
   "scripts": {
     "dev:server": "pnpm --filter @greenlight/server dev",
+    "dev:web": "pnpm --filter @greenlight/web dev",
+    "dev:desktop": "node scripts/dev-desktop.mjs",
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
     "build": "pnpm -r build",
