@@ -8,6 +8,8 @@
   },
   "scripts": {
     "dev": "node --watch src/bin.ts",
+    "build": "tsdown",
+    "deploy": "node scripts/deploy.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests"
   },
@@ -25,6 +27,7 @@
   "devDependencies": {
     "@greenlight/client-runtime": "workspace:*",
     "@types/node": "catalog:",
+    "tsdown": "0.22.2",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }

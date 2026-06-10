@@ -9,6 +9,9 @@
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
     "build": "pnpm -r build",
+    "build:server": "pnpm --filter @greenlight/server build",
+    "deploy:server": "pnpm --filter @greenlight/server run deploy",
+    "dist:mac": "pnpm run build:server && pnpm run deploy:server && pnpm --filter @greenlight/web build && pnpm --filter @greenlight/desktop build && pnpm --filter @greenlight/desktop run dist:mac",
     "lint": "oxlint",
     "fmt": "prettier --write .",
     "fmt:check": "prettier --check ."

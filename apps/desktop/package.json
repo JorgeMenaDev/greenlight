@@ -7,16 +7,16 @@
   "scripts": {
     "build": "tsdown",
     "dev": "GREENLIGHT_DESKTOP_DEV=1 tsdown && GREENLIGHT_DESKTOP_DEV=1 electron .",
+    "dist:mac": "electron-builder --mac dir",
     "typecheck": "tsc --noEmit"
   },
-  "dependencies": {
+  "devDependencies": {
     "@effect/platform-node": "catalog:",
     "@greenlight/shared": "workspace:*",
-    "effect": "catalog:"
-  },
-  "devDependencies": {
     "@types/node": "catalog:",
+    "effect": "catalog:",
     "electron": "42.4.0",
+    "electron-builder": "26.15.2",
     "tsdown": "0.22.2",
     "typescript": "catalog:"
   }

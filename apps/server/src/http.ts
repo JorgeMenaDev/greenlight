@@ -60,7 +60,9 @@ export const evidenceRouteLayer = HttpRouter.add(
 
 /**
  * Serve the built web renderer in production. Resolution order: bundled
- * `client/` next to the server dist, then the monorepo web build.
+ * `client/` next to the server dist, then the monorepo web build, then the
+ * packaged Electron resources layout (resources/server/dist/../../web is
+ * resources/web, where electron-builder copies the web dist).
  */
 const resolveStaticDir = Effect.gen(function* () {
   const path = yield* Path.Path;
@@ -68,6 +70,7 @@ const resolveStaticDir = Effect.gen(function* () {
   const candidates = [
     path.resolve(import.meta.dirname, "client"),
     path.resolve(import.meta.dirname, "../../web/dist"),
+    path.resolve(import.meta.dirname, "../../web"),
   ];
   for (const candidate of candidates) {
     const hasIndex = yield* fs

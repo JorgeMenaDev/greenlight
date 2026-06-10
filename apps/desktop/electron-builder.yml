@@ -1,0 +1,35 @@
+# electron-builder configuration for the Greenlight desktop app.
+#
+# All runtime JS is pre-bundled into dist-electron/ by tsdown, so no
+# node_modules are packaged from this app (its deps are devDependencies).
+# The server ships as an extraResource: apps/server/deploy contains the
+# server bundle plus its own real node_modules (native better-sqlite3,
+# the Copilot CLI, Playwright), and apps/web/dist is the built renderer
+# the server serves from resources/web.
+appId: com.greenlight.app
+productName: Greenlight
+directories:
+  output: release
+files:
+  - dist-electron/**
+  - package.json
+extraResources:
+  # electron-builder hardcodes an exclusion of the root node_modules of any
+  # FileSet (app-builder-lib util/filter.js), so the deploy dir's
+  # node_modules are shipped via a second FileSet rooted AT node_modules:
+  # with that root, no walked path equals "node_modules" and everything is
+  # copied. The deploy node_modules are a real npm install (no symlinks)
+  # holding the server bundle's externals (better-sqlite3, Copilot CLI,
+  # Playwright, effect, ...).
+  - from: ../server/deploy
+    to: server
+  - from: ../server/deploy/node_modules
+    to: server/node_modules
+  - from: ../web/dist
+    to: web
+asar: true
+npmRebuild: false
+mac:
+  # "dir" target: an unpacked .app, no dmg/zip and no codesigning required.
+  target: dir
+  identity: null
