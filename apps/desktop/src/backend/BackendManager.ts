@@ -66,7 +66,10 @@ const resolveBackendCommand = (): BackendCommand => {
   if (process.env["GREENLIGHT_DESKTOP_DEV"] === "1") {
     const repoRoot = NodePath.resolve(__dirname, "..", "..", "..");
     return {
-      command: process.execPath,
+      // System node from PATH, NOT Electron-as-Node: native modules in the
+      // dev node_modules (better-sqlite3) are prebuilt for the system Node
+      // ABI, which differs from Electron's embedded Node.
+      command: "node",
       args: [NodePath.join(repoRoot, "apps", "server", "src", "bin.ts")],
     };
   }

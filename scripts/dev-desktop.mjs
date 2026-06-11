@@ -9,7 +9,7 @@
 import { spawn } from "node:child_process";
 import { setTimeout as delay } from "node:timers/promises";
 
-const VITE_PORT = Number(process.env.GREENLIGHT_WEB_PORT ?? 5173);
+const VITE_PORT = Number(process.env.GREENLIGHT_WEB_PORT ?? 5733);
 const VITE_URL = `http://localhost:${VITE_PORT}/`;
 const WAIT_TIMEOUT_MS = 60_000;
 const POLL_INTERVAL_MS = 250;
@@ -60,7 +60,7 @@ const waitForVite = async () => {
 };
 
 console.log(`[dev-desktop] starting vite dev server on ${VITE_URL} ...`);
-run("vite", "pnpm", ["--filter", "@greenlight/web", "dev", "--", "--port", String(VITE_PORT), "--strictPort"]);
+run("vite", "pnpm", ["--filter", "@greenlight/web", "dev", "--port", String(VITE_PORT), "--strictPort"]);
 
 const ready = await waitForVite();
 if (!ready) {
