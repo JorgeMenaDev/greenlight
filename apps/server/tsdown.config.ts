@@ -5,9 +5,9 @@ import { defineConfig } from "tsdown";
  *
  * The @greenlight/* workspace packages export raw .ts sources, so they are
  * bundled in. Everything that must resolve at runtime from node_modules
- * (native modules, the Copilot CLI, Playwright, and the large stable
- * libraries) stays external; the deploy script (scripts/deploy.mjs) installs
- * exactly those into deploy/node_modules.
+ * (the Copilot CLI, Playwright, and the large stable libraries) stays
+ * external; the deploy script (scripts/deploy.mjs) installs exactly those
+ * into deploy/node_modules.
  */
 export default defineConfig({
   entry: { bin: "src/bin.ts" },
@@ -23,14 +23,15 @@ export default defineConfig({
     /^playwright-core(\/|$)/,
     /^@github\/copilot-sdk(\/|$)/,
     /^@github\/copilot(\/|$)/,
-    "better-sqlite3",
-    /^@effect\/sql-sqlite-node(\/|$)/,
     /^effect(\/|$)/,
     /^@effect\/platform-node(\/|$)/,
     /^@cucumber\/gherkin(\/|$)/,
     /^@cucumber\/messages(\/|$)/,
   ],
   noExternal: [/^@greenlight\//],
+  // The Copilot CLI shim is spawned as its own process entry (see
+  // CopilotService.resolveCliShim), so it must ship next to the bundle.
+  copy: ["src/copilot/copilot-cli-shim.js"],
   dts: false,
   clean: true,
 });

@@ -8,6 +8,10 @@
  *
  * @module CopilotService
  */
+import * as NodeFs from "node:fs";
+import * as NodeModule from "node:module";
+import * as NodePath from "node:path";
+
 import { approveAll, CopilotClient } from "@github/copilot-sdk";
 
 import * as Context from "effect/Context";
@@ -64,6 +68,29 @@ export class CopilotService extends Context.Service<CopilotService, CopilotServi
   "greenlight/copilot/CopilotService",
 ) {}
 
+/**
+ * The bundled Copilot CLI cannot be spawned directly when this server runs
+ * under Electron-as-Node (commander.js misparses argv when
+ * `process.versions.electron` is set without `process.defaultApp`), so the
+ * SDK is pointed at copilot-cli-shim.js via COPILOT_CLI_PATH and the shim
+ * chain-loads the real CLI. The shim sits next to this module in dev (src
+ * runs directly) and next to the bundle in prod (tsdown copies it to dist/).
+ */
+const resolveCliShim = (): { readonly shimPath: string; readonly realCliPath: string } | null => {
+  const shimPath = NodePath.join(import.meta.dirname, "copilot-cli-shim.js");
+  if (!NodeFs.existsSync(shimPath)) return null;
+  // Resolve the real CLI the same way the SDK's getBundledCliPath does, but
+  // anchored at the SDK package (under pnpm @github/copilot is only
+  // resolvable from there, not from this package).
+  const requireFromHere = NodeModule.createRequire(import.meta.url);
+  const requireFromSdk = NodeModule.createRequire(requireFromHere.resolve("@github/copilot-sdk"));
+  for (const base of requireFromSdk.resolve.paths("@github/copilot") ?? []) {
+    const candidate = NodePath.join(base, "@github", "copilot", "index.js");
+    if (NodeFs.existsSync(candidate)) return { shimPath, realCliPath: candidate };
+  }
+  return null;
+};
+
 const copilotTry = <A>(message: string, run: () => Promise<A>): Effect.Effect<A, CopilotError> =>
   Effect.tryPromise({
     try: run,
@@ -84,7 +111,19 @@ export const make = Effect.gen(function* () {
       const existing = yield* Ref.get(clientRef);
       if (existing !== undefined) return existing;
       const client = yield* copilotTry("Failed to start the Copilot CLI runtime", async () => {
-        const created = new CopilotClient({ logLevel: "error" });
+        const shim = resolveCliShim();
+        const created = new CopilotClient({
+          logLevel: "error",
+          ...(shim === null
+            ? {}
+            : {
+                env: {
+                  ...process.env,
+                  COPILOT_CLI_PATH: shim.shimPath,
+                  GREENLIGHT_COPILOT_CLI: shim.realCliPath,
+                },
+              }),
+        });
         await created.start();
         return created;
       });

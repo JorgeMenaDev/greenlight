@@ -49,10 +49,8 @@ const dependencies = {
   "@cucumber/gherkin": direct("@cucumber/gherkin").version,
   "@cucumber/messages": direct("@cucumber/messages").version,
   "@effect/platform-node": direct("@effect/platform-node").version,
-  "@effect/sql-sqlite-node": direct("@effect/sql-sqlite-node").version,
   "@github/copilot": transitive("@github/copilot-sdk", "@github/copilot").version,
   "@github/copilot-sdk": direct("@github/copilot-sdk").version,
-  "better-sqlite3": transitive("@effect/sql-sqlite-node", "better-sqlite3").version,
   effect: direct("effect").version,
   playwright: direct("playwright").version,
 };
@@ -86,7 +84,6 @@ execSync("npm install --omit=dev --no-audit --no-fund --loglevel=error", {
 const mustExist = [
   "dist/bin.mjs",
   "node_modules/@github/copilot",
-  "node_modules/better-sqlite3",
   "node_modules/playwright",
   "node_modules/effect",
 ];

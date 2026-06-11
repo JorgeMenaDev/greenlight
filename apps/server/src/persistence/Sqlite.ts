@@ -7,7 +7,6 @@
  *
  * @module Sqlite
  */
-import * as SqliteClient from "@effect/sql-sqlite-node/SqliteClient";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
@@ -15,6 +14,7 @@ import * as Path from "effect/Path";
 import * as SqlClient from "effect/unstable/sql/SqlClient";
 
 import { ServerConfig } from "../config.ts";
+import * as SqliteClient from "./NodeSqliteClient.ts";
 
 const setup = Layer.effectDiscard(
   Effect.gen(function* () {
