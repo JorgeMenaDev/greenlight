@@ -53,8 +53,89 @@ export class BrowserService extends Context.Service<BrowserService, BrowserServi
 const isHeadless = () => process.env["GREENLIGHT_HEADFUL"] !== "1";
 
 /**
- * Launch the bundled chromium; fall back to the system Chrome channel so
- * users who never ran `playwright install` can still run tests.
+ * Well-known install locations for the Chromium-family browsers that
+ * Playwright can drive through its `channel` option, in preference order.
+ * Used so machines that cannot download the bundled chromium (e.g. blocked
+ * CDN access) can still run against a system browser.
+ */
+const systemChannelCandidates = (): ReadonlyArray<{
+  readonly channel: string;
+  readonly paths: ReadonlyArray<string>;
+}> => {
+  switch (process.platform) {
+    case "darwin":
+      return [
+        {
+          channel: "chrome",
+          paths: ["/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"],
+        },
+        {
+          channel: "msedge",
+          paths: ["/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge"],
+        },
+      ];
+    case "win32": {
+      const programFiles = process.env["PROGRAMFILES"] ?? "C:\\Program Files";
+      const programFilesX86 = process.env["PROGRAMFILES(X86)"] ?? "C:\\Program Files (x86)";
+      const localAppData = process.env["LOCALAPPDATA"];
+      return [
+        {
+          channel: "chrome",
+          paths: [
+            `${programFiles}\\Google\\Chrome\\Application\\chrome.exe`,
+            `${programFilesX86}\\Google\\Chrome\\Application\\chrome.exe`,
+            ...(localAppData !== undefined
+              ? [`${localAppData}\\Google\\Chrome\\Application\\chrome.exe`]
+              : []),
+          ],
+        },
+        {
+          channel: "msedge",
+          paths: [
+            `${programFiles}\\Microsoft\\Edge\\Application\\msedge.exe`,
+            `${programFilesX86}\\Microsoft\\Edge\\Application\\msedge.exe`,
+          ],
+        },
+      ];
+    }
+    default:
+      return [
+        {
+          channel: "chrome",
+          paths: [
+            "/opt/google/chrome/chrome",
+            "/usr/bin/google-chrome",
+            "/usr/bin/google-chrome-stable",
+          ],
+        },
+        {
+          channel: "msedge",
+          paths: ["/opt/microsoft/msedge/msedge", "/usr/bin/microsoft-edge"],
+        },
+      ];
+  }
+};
+
+/** Resolve the first installed system browser channel, if any. */
+const findSystemChannel = (): string | undefined =>
+  systemChannelCandidates().find((candidate) =>
+    candidate.paths.some((path) => NodeFsSync.existsSync(path)),
+  )?.channel;
+
+/** True when the bundled Playwright chromium has been downloaded. */
+const hasBundledChromium = (): boolean => {
+  try {
+    return NodeFsSync.existsSync(chromium.executablePath());
+  } catch {
+    // executablePath throws when no browser is registered.
+    return false;
+  }
+};
+
+/**
+ * Launch the bundled chromium; fall back to a system browser channel
+ * (Chrome/Edge) so users who never ran `playwright install` can still run
+ * tests.
  */
 const launchBrowser: Effect.Effect<Browser, BrowserError> = Effect.tryPromise({
   try: async () => {
@@ -62,8 +143,9 @@ const launchBrowser: Effect.Effect<Browser, BrowserError> = Effect.tryPromise({
     try {
       return await chromium.launch({ headless });
     } catch (chromiumError) {
+      const channel = findSystemChannel() ?? "chrome";
       try {
-        return await chromium.launch({ headless, channel: "chrome" });
+        return await chromium.launch({ headless, channel });
       } catch {
         throw chromiumError;
       }
@@ -122,12 +204,8 @@ export const make = Effect.gen(function* () {
     });
 
   const status: BrowserServiceShape["status"] = Effect.sync(() => {
-    try {
-      if (NodeFsSync.existsSync(chromium.executablePath())) {
-        return { state: "ready" } satisfies BrowserStatus;
-      }
-    } catch {
-      // executablePath throws when no browser is registered.
+    if (hasBundledChromium() || findSystemChannel() !== undefined) {
+      return { state: "ready" } satisfies BrowserStatus;
     }
     return {
       state: "missing",
