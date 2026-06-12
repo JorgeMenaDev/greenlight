@@ -49,9 +49,11 @@ export const evidenceRouteLayer = HttpRouter.add(
       return HttpServerResponse.text("Not Found", { status: 404 });
     }
 
+    const contentType = resolved.kind === "screenshot" ? "image/png" : "text/plain; charset=utf-8";
+
     return yield* HttpServerResponse.file(resolved.filePath, {
       headers: {
-        "content-type": "image/png",
+        "content-type": contentType,
         "cache-control": "private, max-age=31536000, immutable",
       },
     }).pipe(Effect.orDie);

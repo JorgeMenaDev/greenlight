@@ -14,6 +14,7 @@ import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Ref from "effect/Ref";
+import type { ConsoleMessage, Page } from "playwright";
 
 import {
   type BasicAuthCredentials,
@@ -56,6 +57,7 @@ export class RunEngine extends Context.Service<RunEngine, RunEngineShape>()(
 ) {}
 
 const nowIso = Effect.map(DateTime.now, DateTime.formatIso);
+const BROWSER_LOG_LIMIT = 500;
 
 const pendingSteps = (scenario: ParsedScenario): Array<StepResult> =>
   scenario.steps.map((step, index) => ({
@@ -65,6 +67,36 @@ const pendingSteps = (scenario: ParsedScenario): Array<StepResult> =>
     status: "pending" as const,
     evidence: [],
   }));
+
+const createBrowserLogRecorder = (page: Page) => {
+  const messages: Array<string> = [];
+  let cursor = 0;
+  const push = (line: string) => {
+    if (messages.length >= BROWSER_LOG_LIMIT) {
+      messages.shift();
+      cursor = Math.max(0, cursor - 1);
+    }
+    messages.push(line);
+  };
+  const formatConsoleMessage = (message: ConsoleMessage): string =>
+    `[console:${message.type()}] ${message.text()}`;
+
+  page.on("console", (message) => {
+    push(formatConsoleMessage(message));
+  });
+  page.on("pageerror", (error) => {
+    push(`[pageerror] ${error.message}`);
+  });
+
+  return {
+    read: (): ReadonlyArray<string> => messages,
+    consume: (): ReadonlyArray<string> => {
+      const next = messages.slice(cursor);
+      cursor = messages.length;
+      return next;
+    },
+  };
+};
 
 export const make = Effect.gen(function* () {
   const browser = yield* BrowserService;
@@ -128,6 +160,7 @@ export const make = Effect.gen(function* () {
                 ? { httpCredentials: options.httpCredentials }
                 : undefined,
             );
+            const browserLogs = createBrowserLogRecorder(page);
             yield* Effect.tryPromise({
               try: () => page.goto(options.baseUrl, { timeout: 30_000 }),
               catch: (cause) =>
@@ -140,7 +173,8 @@ export const make = Effect.gen(function* () {
 
             const verdict: VerdictSlot = { current: null };
             const budget = { remaining: 0 };
-            const emitActivity = (pickleId: PickleId, stepIndex: number) =>
+            const emitActivity =
+              (pickleId: PickleId, stepIndex: number) =>
               (activity: { tool: string; summary: string }) => {
                 Effect.runFork(
                   emit({
@@ -161,6 +195,7 @@ export const make = Effect.gen(function* () {
               onActivity: (activity) =>
                 emitActivity(scenario.pickleId, activityTarget.stepIndex)(activity),
               saveScreenshot,
+              readConsoleMessages: browserLogs.read,
               verdict,
               budget,
             });
@@ -190,8 +225,43 @@ export const make = Effect.gen(function* () {
               }
 
               const stepStartedAt = yield* nowIso;
-              steps[stepIndex] = { ...steps[stepIndex]!, status: "running", startedAt: stepStartedAt };
+              steps[stepIndex] = {
+                ...steps[stepIndex]!,
+                status: "running",
+                startedAt: stepStartedAt,
+              };
               yield* emit({ type: "step.started", pickleId: scenario.pickleId, stepIndex });
+
+              const captureStepEvidence = (stepNumber: number) =>
+                Effect.gen(function* () {
+                  const evidence: Array<EvidenceRef> = [];
+                  const screenshotData = yield* Effect.promise(() =>
+                    page.screenshot({ type: "png" }).catch(() => undefined),
+                  );
+                  if (screenshotData !== undefined) {
+                    evidence.push(
+                      yield* evidenceStore.saveScreenshot(
+                        options.runId,
+                        `After step ${stepNumber}`,
+                        screenshotData,
+                      ),
+                    );
+                  }
+
+                  const consoleText = browserLogs.consume().join("\n");
+                  if (consoleText !== "") {
+                    evidence.push(
+                      yield* evidenceStore.saveText(
+                        options.runId,
+                        "console",
+                        `Console after step ${stepNumber}`,
+                        consoleText,
+                      ),
+                    );
+                  }
+
+                  return evidence;
+                });
 
               const stepVerdict = yield* executeStep({
                 session,
@@ -202,33 +272,63 @@ export const make = Effect.gen(function* () {
                 baseUrl: options.baseUrl,
                 verdict,
                 budget,
-              });
-
-              // Engine-captured screenshot: evidence even when the agent
-              // didn't take one (or lied).
-              const evidence: Array<EvidenceRef> = [];
-              const screenshotData = yield* Effect.promise(() =>
-                page.screenshot({ type: "png" }).catch(() => undefined),
+              }).pipe(
+                Effect.match({
+                  onSuccess: (verdict) => ({ type: "verdict", verdict }) as const,
+                  onFailure: (error) =>
+                    ({
+                      type: "agent-error",
+                      message: `Agent error: ${error.message}`,
+                    }) as const,
+                }),
               );
-              if (screenshotData !== undefined) {
-                evidence.push(
-                  yield* evidenceStore.saveScreenshot(
-                    options.runId,
-                    `After step ${stepIndex + 1}`,
-                    screenshotData,
-                  ),
-                );
+
+              const evidence = yield* captureStepEvidence(stepIndex + 1);
+              const finishedAt = yield* nowIso;
+
+              if (stepVerdict.type === "agent-error") {
+                steps[stepIndex] = {
+                  ...steps[stepIndex]!,
+                  status: "failed",
+                  finishedAt,
+                  agentSummary: stepVerdict.message,
+                  errorMessage: stepVerdict.message,
+                  evidence,
+                };
+                yield* emit({
+                  type: "step.finished",
+                  pickleId: scenario.pickleId,
+                  stepIndex,
+                  result: steps[stepIndex]!,
+                });
+                scenarioResults[scenarioIndex] = {
+                  ...scenarioResults[scenarioIndex]!,
+                  status: "failed",
+                  startedAt,
+                  finishedAt,
+                  steps,
+                };
+                yield* emit({
+                  type: "scenario.finished",
+                  pickleId: scenario.pickleId,
+                  status: "failed",
+                });
+                return yield* Effect.fail(new Error(stepVerdict.message));
               }
 
-              const finishedAt = yield* nowIso;
+              const verdictResult = stepVerdict.verdict;
               steps[stepIndex] = {
                 ...steps[stepIndex]!,
-                status: stepVerdict.status,
+                status: verdictResult.status,
                 finishedAt,
-                agentSummary: stepVerdict.summary,
-                ...(stepVerdict.expected !== undefined ? { expected: stepVerdict.expected } : {}),
-                ...(stepVerdict.actual !== undefined ? { actual: stepVerdict.actual } : {}),
-                ...(stepVerdict.status === "failed" ? { errorMessage: stepVerdict.summary } : {}),
+                agentSummary: verdictResult.summary,
+                ...(verdictResult.expected !== undefined
+                  ? { expected: verdictResult.expected }
+                  : {}),
+                ...(verdictResult.actual !== undefined ? { actual: verdictResult.actual } : {}),
+                ...(verdictResult.status === "failed"
+                  ? { errorMessage: verdictResult.summary }
+                  : {}),
                 evidence,
               };
               yield* emit({
@@ -238,7 +338,7 @@ export const make = Effect.gen(function* () {
                 result: steps[stepIndex]!,
               });
 
-              if (stepVerdict.status === "failed") failed = true;
+              if (verdictResult.status === "failed") failed = true;
             }
 
             const status: StepStatus = failed ? "failed" : "passed";
@@ -255,9 +355,14 @@ export const make = Effect.gen(function* () {
         );
 
       for (let index = 0; index < options.scenarios.length; index++) {
-        const failure: string | undefined = yield* runScenario(options.scenarios[index]!, index).pipe(
+        const failure: string | undefined = yield* runScenario(
+          options.scenarios[index]!,
+          index,
+        ).pipe(
           Effect.as(undefined),
-          Effect.catch((error) => Effect.succeed(error.message)),
+          Effect.catch((error) =>
+            Effect.succeed(error instanceof Error ? error.message : String(error)),
+          ),
         );
         if (failure !== undefined) {
           runError = failure;

@@ -1,5 +1,5 @@
 /**
- * EvidenceStore - screenshot (and later trace/console) blob storage.
+ * EvidenceStore - screenshot, console and trace blob storage.
  *
  * Blobs live as files under `dataDir/evidence/<runId>/`; metadata lives
  * in the `evidence` table so the HTTP route can resolve ids to files.
@@ -15,7 +15,7 @@ import * as Path from "effect/Path";
 import * as Ref from "effect/Ref";
 import * as SqlClient from "effect/unstable/sql/SqlClient";
 
-import { EvidenceId, type EvidenceRef, type RunId } from "@greenlight/contracts";
+import { EvidenceId, type EvidenceKind, type EvidenceRef, type RunId } from "@greenlight/contracts";
 
 import { ServerConfig } from "../config.ts";
 
@@ -24,6 +24,12 @@ export interface EvidenceStoreShape {
     runId: RunId,
     label: string,
     data: Uint8Array,
+  ) => Effect.Effect<EvidenceRef>;
+  readonly saveText: (
+    runId: RunId,
+    kind: Exclude<EvidenceKind, "screenshot">,
+    label: string,
+    text: string,
   ) => Effect.Effect<EvidenceRef>;
   /** Resolve an evidence id to an on-disk file path. */
   readonly resolve: (
@@ -43,21 +49,41 @@ export const make = Effect.gen(function* () {
   const path = yield* Path.Path;
   const counter = yield* Ref.make(0);
 
-  const saveScreenshot: EvidenceStoreShape["saveScreenshot"] = (runId, label, data) =>
+  const saveEvidence = (
+    runId: RunId,
+    kind: EvidenceKind,
+    label: string,
+    extension: string,
+    data: Uint8Array,
+  ) =>
     Effect.gen(function* () {
       const n = yield* Ref.getAndUpdate(counter, (value) => value + 1);
       const createdAt = DateTime.formatIso(yield* DateTime.now);
-      const id = EvidenceId.make(`${runId}-${DateTime.toEpochMillis(yield* DateTime.now).toString(36)}-${n}`);
+      const id = EvidenceId.make(
+        `${runId}-${DateTime.toEpochMillis(yield* DateTime.now).toString(36)}-${n}`,
+      );
       const dir = path.join(config.evidenceDir, runId);
-      const filePath = path.join(dir, `${id}.png`);
+      const filePath = path.join(dir, `${id}.${extension}`);
       yield* fs.makeDirectory(dir, { recursive: true }).pipe(Effect.orDie);
       yield* fs.writeFile(filePath, data).pipe(Effect.orDie);
       yield* sql`
         INSERT INTO evidence (id, run_id, kind, label, file_path, created_at)
-        VALUES (${id}, ${runId}, ${"screenshot"}, ${label}, ${filePath}, ${createdAt})
+        VALUES (${id}, ${runId}, ${kind}, ${label}, ${filePath}, ${createdAt})
       `.pipe(Effect.orDie);
-      return { id, kind: "screenshot", label, createdAt } satisfies EvidenceRef;
+      return { id, kind, label, createdAt } satisfies EvidenceRef;
     });
+
+  const saveScreenshot: EvidenceStoreShape["saveScreenshot"] = (runId, label, data) =>
+    saveEvidence(runId, "screenshot", label, "png", data);
+
+  const saveText: EvidenceStoreShape["saveText"] = (runId, kind, label, text) =>
+    saveEvidence(
+      runId,
+      kind,
+      label,
+      kind === "console" ? "log" : "txt",
+      new TextEncoder().encode(text),
+    );
 
   const resolve: EvidenceStoreShape["resolve"] = (id) =>
     Effect.gen(function* () {
@@ -77,7 +103,7 @@ export const make = Effect.gen(function* () {
         .pipe(Effect.ignore);
     });
 
-  return { saveScreenshot, resolve, deleteForRun } satisfies EvidenceStoreShape;
+  return { saveScreenshot, saveText, resolve, deleteForRun } satisfies EvidenceStoreShape;
 });
 
 export const EvidenceStoreLive = Layer.effect(EvidenceStore, make);
