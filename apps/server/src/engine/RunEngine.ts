@@ -16,6 +16,7 @@ import * as Layer from "effect/Layer";
 import * as Ref from "effect/Ref";
 
 import {
+  type BasicAuthCredentials,
   type EvidenceRef,
   type ParsedScenario,
   type PickleId,
@@ -38,6 +39,7 @@ export interface ExecuteRunOptions {
   readonly runId: RunId;
   readonly featurePath: string;
   readonly baseUrl: string;
+  readonly httpCredentials?: BasicAuthCredentials | undefined;
   readonly model?: string | undefined;
   readonly scenarios: ReadonlyArray<ParsedScenario>;
   /** Receives every run event in order. Must not fail. */
@@ -121,7 +123,11 @@ export const make = Effect.gen(function* () {
             const startedAt = yield* nowIso;
             yield* emit({ type: "scenario.started", pickleId: scenario.pickleId });
 
-            const page = yield* browser.acquirePage;
+            const page = yield* browser.acquirePage(
+              options.httpCredentials !== undefined
+                ? { httpCredentials: options.httpCredentials }
+                : undefined,
+            );
             yield* Effect.tryPromise({
               try: () => page.goto(options.baseUrl, { timeout: 30_000 }),
               catch: (cause) =>

@@ -737,6 +737,18 @@ a {
   gap: 0.2rem;
 }
 
+.toolbar-target-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.toolbar-auth-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
 .toolbar-grow {
   flex: 1;
   min-width: 0;

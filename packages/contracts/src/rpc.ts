@@ -89,6 +89,12 @@ const FeatureParse = Schema.Struct({
   errors: Schema.Array(GherkinParseError),
 });
 
+export const BasicAuthCredentials = Schema.Struct({
+  username: Schema.String,
+  password: Schema.String,
+});
+export type BasicAuthCredentials = typeof BasicAuthCredentials.Type;
+
 export const WsProjectOpenRpc = Rpc.make(WS_METHODS.projectOpen, {
   payload: Schema.Struct({ path: Schema.String }),
   success: ProjectInfo,
@@ -139,16 +145,12 @@ export const WsRunStartRpc = Rpc.make(WS_METHODS.runStart, {
   payload: Schema.Struct({
     featurePath: Schema.String,
     baseUrl: Schema.String,
+    httpCredentials: Schema.optional(BasicAuthCredentials),
     pickleIds: Schema.optional(Schema.Array(PickleId)),
     model: Schema.optional(Schema.String),
   }),
   success: Schema.Struct({ runId: RunId }),
-  error: Schema.Union([
-    NoProjectOpenError,
-    FeatureIoError,
-    RunAlreadyActiveError,
-    RunStartError,
-  ]),
+  error: Schema.Union([NoProjectOpenError, FeatureIoError, RunAlreadyActiveError, RunStartError]),
 });
 
 export const WsRunCancelRpc = Rpc.make(WS_METHODS.runCancel, {

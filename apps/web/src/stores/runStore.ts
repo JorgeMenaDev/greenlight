@@ -4,6 +4,7 @@
  */
 import {
   applyRunEvent,
+  type BasicAuthCredentials,
   type PickleId,
   type Run,
   type RunEvent,
@@ -30,6 +31,7 @@ export const activityKey = (pickleId: PickleId, stepIndex: number): string =>
 export interface StartRunParams {
   featurePath: string;
   baseUrl: string;
+  httpCredentials?: BasicAuthCredentials;
   pickleIds?: ReadonlyArray<PickleId>;
   model?: string;
 }
@@ -160,6 +162,10 @@ export const startRunWithConfig = (pickleIds?: ReadonlyArray<PickleId>): void =>
   const app = useAppStore.getState();
   const featurePath = app.selectedFeaturePath;
   const baseUrl = app.targetUrl.trim();
+  const authUsername = app.authUsername.trim();
+  const authPassword = app.authPassword;
+  const hasUsername = authUsername !== "";
+  const hasPassword = authPassword !== "";
   if (featurePath === undefined) {
     useRunStore.setState({ runError: "Select a feature file first." });
     return;
@@ -168,9 +174,18 @@ export const startRunWithConfig = (pickleIds?: ReadonlyArray<PickleId>): void =>
     useRunStore.setState({ runError: "Set a target URL in the toolbar first." });
     return;
   }
+  if (hasUsername !== hasPassword) {
+    useRunStore.setState({
+      runError: "Enter both basic auth username and password, or leave both blank.",
+    });
+    return;
+  }
+  const httpCredentials: BasicAuthCredentials | undefined =
+    hasUsername && hasPassword ? { username: authUsername, password: authPassword } : undefined;
   void useRunStore.getState().startRun({
     featurePath,
     baseUrl,
+    ...(httpCredentials !== undefined ? { httpCredentials } : {}),
     ...(pickleIds !== undefined ? { pickleIds } : {}),
     ...(app.model !== "" ? { model: app.model } : {}),
   });

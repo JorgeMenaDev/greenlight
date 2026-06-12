@@ -27,8 +27,12 @@ export class BrowserError extends Data.TaggedError("BrowserError")<{
 }> {}
 
 export interface AcquirePageOptions {
-  /** Used only for labeling; navigation is the engine's job. */
-  readonly headless?: boolean;
+  readonly httpCredentials?:
+    | {
+        readonly username: string;
+        readonly password: string;
+      }
+    | undefined;
 }
 
 export interface BrowserServiceShape {
@@ -36,7 +40,9 @@ export interface BrowserServiceShape {
    * Acquire a page in a fresh browser context. The context closes with
    * the caller's scope.
    */
-  readonly acquirePage: Effect.Effect<Page, BrowserError, Scope.Scope>;
+  readonly acquirePage: (
+    options?: AcquirePageOptions,
+  ) => Effect.Effect<Page, BrowserError, Scope.Scope>;
   readonly status: Effect.Effect<BrowserStatus>;
 }
 
@@ -92,20 +98,28 @@ export const make = Effect.gen(function* () {
     }),
   );
 
-  const acquirePage: BrowserServiceShape["acquirePage"] = Effect.gen(function* () {
-    const browser = yield* getBrowser;
-    const context = yield* Effect.acquireRelease(
-      Effect.tryPromise({
-        try: () => browser.newContext({ viewport: { width: 1280, height: 720 } }),
-        catch: (cause) => new BrowserError({ message: "Failed to create browser context", cause }),
-      }),
-      (ctx) => Effect.promise(() => ctx.close()).pipe(Effect.ignore),
-    );
-    return yield* Effect.tryPromise({
-      try: () => context.newPage(),
-      catch: (cause) => new BrowserError({ message: "Failed to open page", cause }),
+  const acquirePage: BrowserServiceShape["acquirePage"] = (options = {}) =>
+    Effect.gen(function* () {
+      const browser = yield* getBrowser;
+      const context = yield* Effect.acquireRelease(
+        Effect.tryPromise({
+          try: () =>
+            browser.newContext({
+              viewport: { width: 1280, height: 720 },
+              ...(options.httpCredentials !== undefined
+                ? { httpCredentials: options.httpCredentials }
+                : {}),
+            }),
+          catch: (cause) =>
+            new BrowserError({ message: "Failed to create browser context", cause }),
+        }),
+        (ctx) => Effect.promise(() => ctx.close()).pipe(Effect.ignore),
+      );
+      return yield* Effect.tryPromise({
+        try: () => context.newPage(),
+        catch: (cause) => new BrowserError({ message: "Failed to open page", cause }),
+      });
     });
-  });
 
   const status: BrowserServiceShape["status"] = Effect.sync(() => {
     try {

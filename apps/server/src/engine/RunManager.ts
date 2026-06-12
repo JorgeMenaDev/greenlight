@@ -24,6 +24,7 @@ import {
   RunId,
   RunNotFoundError,
   RunStartError,
+  type BasicAuthCredentials,
   type PickleId,
   type Run,
   type RunEvent,
@@ -38,6 +39,7 @@ import { RunEventBus } from "./RunEventBus.ts";
 export interface StartRunOptions {
   readonly featurePath: string;
   readonly baseUrl: string;
+  readonly httpCredentials?: BasicAuthCredentials | undefined;
   readonly pickleIds?: ReadonlyArray<PickleId> | undefined;
   readonly model?: string | undefined;
 }
@@ -124,6 +126,7 @@ export const make = Effect.gen(function* () {
           runId,
           featurePath: options.featurePath,
           baseUrl: options.baseUrl,
+          httpCredentials: options.httpCredentials,
           model: options.model,
           scenarios,
           onEvent,

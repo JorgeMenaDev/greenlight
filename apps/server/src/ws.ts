@@ -4,6 +4,7 @@
  * @module ws
  */
 import {
+  type BasicAuthCredentials,
   CopilotUnavailableError,
   WS_METHODS,
   WsRpcGroup,
@@ -81,12 +82,14 @@ const makeWsRpcLayer = WsRpcGroup.toLayer(
       [WS_METHODS.runStart]: (payload: {
         readonly featurePath: string;
         readonly baseUrl: string;
+        readonly httpCredentials?: BasicAuthCredentials | undefined;
         readonly pickleIds?: ReadonlyArray<string> | undefined;
         readonly model?: string | undefined;
       }) =>
         runManager.start({
           featurePath: payload.featurePath,
           baseUrl: payload.baseUrl,
+          httpCredentials: payload.httpCredentials,
           pickleIds: payload.pickleIds as never,
           model: payload.model,
         }),
