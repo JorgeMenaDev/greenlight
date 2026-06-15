@@ -50,7 +50,7 @@ export class BrowserService extends Context.Service<BrowserService, BrowserServi
   "greenlight/browser/BrowserService",
 ) {}
 
-const isHeadless = () => process.env["GREENLIGHT_HEADFUL"] !== "1";
+const isHeadless = () => process.env.GREENLIGHT_HEADFUL !== "1";
 
 /**
  * Well-known install locations for the Chromium-family browsers that
@@ -58,28 +58,28 @@ const isHeadless = () => process.env["GREENLIGHT_HEADFUL"] !== "1";
  * Used so machines that cannot download the bundled chromium (e.g. blocked
  * CDN access) can still run against a system browser.
  */
-const systemChannelCandidates = (): ReadonlyArray<{
-  readonly channel: string;
-  readonly paths: ReadonlyArray<string>;
-}> => {
+const systemChannelCandidates = () => {
   switch (process.platform) {
     case "darwin":
       return [
         {
+          label: "Google Chrome",
           channel: "chrome",
           paths: ["/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"],
         },
         {
+          label: "Microsoft Edge",
           channel: "msedge",
           paths: ["/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge"],
         },
       ];
     case "win32": {
-      const programFiles = process.env["PROGRAMFILES"] ?? "C:\\Program Files";
+      const programFiles = process.env.PROGRAMFILES ?? "C:\\Program Files";
       const programFilesX86 = process.env["PROGRAMFILES(X86)"] ?? "C:\\Program Files (x86)";
-      const localAppData = process.env["LOCALAPPDATA"];
+      const localAppData = process.env.LOCALAPPDATA;
       return [
         {
+          label: "Google Chrome",
           channel: "chrome",
           paths: [
             `${programFiles}\\Google\\Chrome\\Application\\chrome.exe`,
@@ -90,6 +90,7 @@ const systemChannelCandidates = (): ReadonlyArray<{
           ],
         },
         {
+          label: "Microsoft Edge",
           channel: "msedge",
           paths: [
             `${programFiles}\\Microsoft\\Edge\\Application\\msedge.exe`,
@@ -101,6 +102,7 @@ const systemChannelCandidates = (): ReadonlyArray<{
     default:
       return [
         {
+          label: "Google Chrome",
           channel: "chrome",
           paths: [
             "/opt/google/chrome/chrome",
@@ -109,18 +111,13 @@ const systemChannelCandidates = (): ReadonlyArray<{
           ],
         },
         {
+          label: "Microsoft Edge",
           channel: "msedge",
           paths: ["/opt/microsoft/msedge/msedge", "/usr/bin/microsoft-edge"],
         },
       ];
   }
 };
-
-/** Resolve the first installed system browser channel, if any. */
-const findSystemChannel = (): string | undefined =>
-  systemChannelCandidates().find((candidate) =>
-    candidate.paths.some((path) => NodeFsSync.existsSync(path)),
-  )?.channel;
 
 /** True when the bundled Playwright chromium has been downloaded. */
 const hasBundledChromium = (): boolean => {
@@ -132,24 +129,44 @@ const hasBundledChromium = (): boolean => {
   }
 };
 
+const systemBrowserCandidates = () =>
+  systemChannelCandidates().map((candidate) => ({
+    label: candidate.label,
+    isAvailable: () => candidate.paths.some((path) => NodeFsSync.existsSync(path)),
+    launch: (headless: boolean) => chromium.launch({ headless, channel: candidate.channel }),
+  }));
+
+const bundledChromiumCandidate = {
+  label: "Playwright Chromium",
+  isAvailable: hasBundledChromium,
+  launch: (headless: boolean) => chromium.launch({ headless }),
+};
+
+const browserCandidates = () => [bundledChromiumCandidate, ...systemBrowserCandidates()];
+
+const availableBrowserCandidates = () =>
+  browserCandidates().filter((candidate) => candidate.isAvailable());
+
 /**
- * Launch the bundled chromium; fall back to a system browser channel
- * (Chrome/Edge) so users who never ran `playwright install` can still run
- * tests.
+ * Launch the first available browser candidate. If none are detected, try
+ * bundled Chromium once so Playwright can surface its normal install error.
  */
 const launchBrowser: Effect.Effect<Browser, BrowserError> = Effect.tryPromise({
   try: async () => {
     const headless = isHeadless();
-    try {
-      return await chromium.launch({ headless });
-    } catch (chromiumError) {
-      const channel = findSystemChannel() ?? "chrome";
+    const candidates = availableBrowserCandidates();
+    const launchOrder = candidates.length > 0 ? candidates : [bundledChromiumCandidate];
+    let firstError: unknown;
+
+    for (const candidate of launchOrder) {
       try {
-        return await chromium.launch({ headless, channel });
-      } catch {
-        throw chromiumError;
+        return await candidate.launch(headless);
+      } catch (error) {
+        firstError ??= error;
       }
     }
+
+    throw firstError;
   },
   catch: (cause) =>
     new BrowserError({
@@ -167,7 +184,7 @@ export const make = Effect.gen(function* () {
   const getBrowser = launchLock.withPermits(1)(
     Effect.gen(function* () {
       const existing = yield* Ref.get(browserRef);
-      if (existing !== undefined && existing.isConnected()) {
+      if (existing?.isConnected()) {
         return existing;
       }
       const browser = yield* launchBrowser;
@@ -204,7 +221,7 @@ export const make = Effect.gen(function* () {
     });
 
   const status: BrowserServiceShape["status"] = Effect.sync(() => {
-    if (hasBundledChromium() || findSystemChannel() !== undefined) {
+    if (availableBrowserCandidates().length > 0) {
       return { state: "ready" } satisfies BrowserStatus;
     }
     return {

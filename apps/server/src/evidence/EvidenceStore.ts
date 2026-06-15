@@ -1,5 +1,5 @@
 /**
- * EvidenceStore - screenshot, console and trace blob storage.
+ * EvidenceStore - screenshot and browser console blob storage.
  *
  * Blobs live as files under `dataDir/evidence/<runId>/`; metadata lives
  * in the `evidence` table so the HTTP route can resolve ids to files.
@@ -15,7 +15,7 @@ import * as Path from "effect/Path";
 import * as Ref from "effect/Ref";
 import * as SqlClient from "effect/unstable/sql/SqlClient";
 
-import { EvidenceId, type EvidenceKind, type EvidenceRef, type RunId } from "@greenlight/contracts";
+import { EvidenceId, type EvidenceRef, type RunId } from "@greenlight/contracts";
 
 import { ServerConfig } from "../config.ts";
 
@@ -25,9 +25,8 @@ export interface EvidenceStoreShape {
     label: string,
     data: Uint8Array,
   ) => Effect.Effect<EvidenceRef>;
-  readonly saveText: (
+  readonly saveConsoleLog: (
     runId: RunId,
-    kind: Exclude<EvidenceKind, "screenshot">,
     label: string,
     text: string,
   ) => Effect.Effect<EvidenceRef>;
@@ -51,7 +50,7 @@ export const make = Effect.gen(function* () {
 
   const saveEvidence = (
     runId: RunId,
-    kind: EvidenceKind,
+    kind: "screenshot" | "console",
     label: string,
     extension: string,
     data: Uint8Array,
@@ -76,14 +75,8 @@ export const make = Effect.gen(function* () {
   const saveScreenshot: EvidenceStoreShape["saveScreenshot"] = (runId, label, data) =>
     saveEvidence(runId, "screenshot", label, "png", data);
 
-  const saveText: EvidenceStoreShape["saveText"] = (runId, kind, label, text) =>
-    saveEvidence(
-      runId,
-      kind,
-      label,
-      kind === "console" ? "log" : "txt",
-      new TextEncoder().encode(text),
-    );
+  const saveConsoleLog: EvidenceStoreShape["saveConsoleLog"] = (runId, label, text) =>
+    saveEvidence(runId, "console", label, "log", new TextEncoder().encode(text));
 
   const resolve: EvidenceStoreShape["resolve"] = (id) =>
     Effect.gen(function* () {
@@ -92,7 +85,7 @@ export const make = Effect.gen(function* () {
       );
       const first = rows[0];
       if (first === undefined) return undefined;
-      return { filePath: String(first["file_path"]), kind: String(first["kind"]) };
+      return { filePath: String(first.file_path), kind: String(first.kind) };
     });
 
   const deleteForRun: EvidenceStoreShape["deleteForRun"] = (runId) =>
@@ -103,7 +96,7 @@ export const make = Effect.gen(function* () {
         .pipe(Effect.ignore);
     });
 
-  return { saveScreenshot, saveText, resolve, deleteForRun } satisfies EvidenceStoreShape;
+  return { saveScreenshot, saveConsoleLog, resolve, deleteForRun } satisfies EvidenceStoreShape;
 });
 
 export const EvidenceStoreLive = Layer.effect(EvidenceStore, make);

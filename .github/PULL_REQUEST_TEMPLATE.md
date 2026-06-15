@@ -23,20 +23,8 @@ expected results, and edge cases. -->
 <!-- Check all that apply before requesting review or merging. -->
 
 - [ ] Updated relevant documentation and README (if needed)
-- [ ] Added/updated tests (if needed)
+- [ ] Did not add or modify `.test` files unless explicitly requested
 - [ ] Noted breaking changes (if any)
-- [ ] Validated on required platforms/methods:
-  - [ ] MacOS
-    - [ ] npm run
-    - [ ] npx
-    - [ ] Docker
-    - [ ] Podman
-    - [ ] Seatbelt
-  - [ ] Windows
-    - [ ] npm run
-    - [ ] npx
-    - [ ] Docker
-  - [ ] Linux
-    - [ ] npm run
-    - [ ] npx
-    - [ ] Docker
+- [ ] Ran relevant pnpm checks (`pnpm typecheck`, `pnpm lint`, `pnpm fmt:check`)
+- [ ] Validated UI-facing changes through Browser, Helium, or Chrome instead of Playwright
+- [ ] For engine changes, ran the headless demo or another existing non-test workflow
