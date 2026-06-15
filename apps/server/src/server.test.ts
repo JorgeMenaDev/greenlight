@@ -30,9 +30,7 @@ describe("greenlight server", () => {
       Effect.scoped(
         Effect.gen(function* () {
           const port = yield* withServerPort;
-          const response = yield* Effect.promise(() =>
-            fetch(`http://127.0.0.1:${port}/healthz`),
-          );
+          const response = yield* Effect.promise(() => fetch(`http://127.0.0.1:${port}/healthz`));
           expect(response.status).toBe(200);
           const body = yield* Effect.promise(() => response.text());
           expect(body).toContain("ok");

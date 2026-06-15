@@ -53,7 +53,9 @@ export const RunDetailView = ({ runId, onBack }: RunDetailViewProps) => {
       </div>
 
       {error !== undefined && <div className="banner banner-error">{error}</div>}
-      {run === undefined && error === undefined && <div className="panel-empty pulse">Loading…</div>}
+      {run === undefined && error === undefined && (
+        <div className="panel-empty pulse">Loading…</div>
+      )}
 
       {run !== undefined && (
         <div className="run-detail-content">

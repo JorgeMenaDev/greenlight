@@ -47,10 +47,8 @@ export interface SqliteClientConfig {
   readonly transformQueryNames?: ((str: string) => string) | undefined;
 }
 
-export interface SqliteMemoryClientConfig extends Omit<
-  SqliteClientConfig,
-  "filename" | "readonly"
-> {}
+export interface SqliteMemoryClientConfig
+  extends Omit<SqliteClientConfig, "filename" | "readonly"> {}
 
 /**
  * Verify that the current Node.js version includes the `node:sqlite` APIs

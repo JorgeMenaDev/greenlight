@@ -41,9 +41,7 @@ const logListeningLayer = Layer.effectDiscard(
     const server = yield* HttpServer.HttpServer;
     const address = server.address;
     if (typeof address !== "string" && "port" in address) {
-      yield* Effect.logInfo(
-        `Greenlight server listening on http://${config.host}:${address.port}`,
-      );
+      yield* Effect.logInfo(`Greenlight server listening on http://${config.host}:${address.port}`);
     }
   }),
 );
@@ -51,9 +49,7 @@ const logListeningLayer = Layer.effectDiscard(
 /** Every domain service, wired bottom-up over Sqlite + ServerConfig. */
 export const servicesLayer = RunManagerLive.pipe(
   Layer.provideMerge(RunEngineLive),
-  Layer.provideMerge(
-    Layer.mergeAll(BrowserServiceLive, CopilotServiceLive, GherkinServiceLive),
-  ),
+  Layer.provideMerge(Layer.mergeAll(BrowserServiceLive, CopilotServiceLive, GherkinServiceLive)),
   Layer.provideMerge(Layer.mergeAll(RunEventBusLive, ProjectServiceLive)),
   Layer.provideMerge(Layer.mergeAll(RunStoreLive, EvidenceStoreLive)),
   Layer.provideMerge(SqliteLive),
