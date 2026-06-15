@@ -18,12 +18,20 @@ export type ConnectionState = "connecting" | "connected" | "error";
 export type AppView = "project" | "workspace" | "history";
 
 const targetUrlKey = (projectPath: string): string => `greenlight:targetUrl:${projectPath}`;
+const TODO_MVC_TARGET_URL = "https://demo.playwright.dev/todomvc";
+
+const defaultTargetUrl = (projectPath: string) => {
+  const normalized = projectPath.replaceAll("\\", "/");
+  return normalized === "examples/todomvc" || normalized.endsWith("/examples/todomvc")
+    ? TODO_MVC_TARGET_URL
+    : "";
+};
 
 const readTargetUrl = (projectPath: string): string => {
   try {
-    return window.localStorage.getItem(targetUrlKey(projectPath)) ?? "";
+    return window.localStorage.getItem(targetUrlKey(projectPath)) ?? defaultTargetUrl(projectPath);
   } catch {
-    return "";
+    return defaultTargetUrl(projectPath);
   }
 };
 

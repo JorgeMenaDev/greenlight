@@ -26,6 +26,8 @@ import {
 
 const CURRENT_PROJECT_KEY = "currentProjectPath";
 const SKIPPED_DIRECTORIES = new Set(["node_modules", ".git", "dist", "build"]);
+const DEFAULT_PROJECT_PARTS = ["examples", "todomvc"] as const;
+const DEFAULT_PROJECT_FEATURE = "todo.feature";
 
 export interface ProjectServiceShape {
   readonly open: (path: string) => Effect.Effect<ProjectInfo, ProjectError>;
@@ -132,6 +134,31 @@ export const make = Effect.gen(function* () {
       return entries.sort((a, b) => a.path.localeCompare(b.path));
     });
 
+  const findDefaultProjectFrom = (start: string) =>
+    Effect.gen(function* () {
+      let current = path.resolve(start);
+      while (true) {
+        const candidate = path.join(current, ...DEFAULT_PROJECT_PARTS);
+        const hasDemoFeature = yield* fs
+          .exists(path.join(candidate, DEFAULT_PROJECT_FEATURE))
+          .pipe(Effect.orElseSucceed(() => false));
+        if (hasDemoFeature) return candidate;
+
+        const parent = path.dirname(current);
+        if (parent === current) return undefined;
+        current = parent;
+      }
+    });
+
+  const findDefaultProject = Effect.gen(function* () {
+    const starts = [process.cwd(), import.meta.dirname];
+    for (const start of starts) {
+      const project = yield* findDefaultProjectFrom(start);
+      if (project !== undefined) return project;
+    }
+    return undefined;
+  });
+
   const open: ProjectServiceShape["open"] = (rawPath) =>
     Effect.gen(function* () {
       const root = path.resolve(rawPath);
@@ -156,9 +183,16 @@ export const make = Effect.gen(function* () {
 
   const current: ProjectServiceShape["current"] = Effect.gen(function* () {
     const root = yield* getCurrentPath;
-    if (root === undefined) return null;
-    const features = yield* walkFeatures(root).pipe(Effect.orElseSucceed(() => []));
-    return { path: root, featureCount: features.length } satisfies ProjectInfo;
+    if (root !== undefined) {
+      const currentProject = yield* walkFeatures(root).pipe(Effect.option);
+      if (currentProject._tag === "Some") {
+        return { path: root, featureCount: currentProject.value.length } satisfies ProjectInfo;
+      }
+    }
+
+    const defaultProject = yield* findDefaultProject;
+    if (defaultProject === undefined) return null;
+    return yield* open(defaultProject).pipe(Effect.orElseSucceed(() => null));
   });
 
   const recent: ProjectServiceShape["recent"] = Effect.gen(function* () {
