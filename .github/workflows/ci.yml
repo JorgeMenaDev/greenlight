@@ -16,6 +16,6 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: ./node_modules/.bin/playwright install --with-deps chromium
+      - run: ./apps/server/node_modules/.bin/playwright install --with-deps chromium
       - run: pnpm typecheck
       - run: pnpm test
