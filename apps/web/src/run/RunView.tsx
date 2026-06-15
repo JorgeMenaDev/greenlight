@@ -17,7 +17,7 @@ const STEP_ICONS: Record<StepStatus, string> = {
 };
 
 export const StatusIcon = ({ status }: { status: StepStatus }) => (
-  <span className={`status-icon status-${status}`} aria-label={status} title={status}>
+  <span className={`status-icon status-${status}`} role="img" aria-label={status} title={status}>
     {STEP_ICONS[status]}
   </span>
 );

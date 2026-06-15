@@ -2,7 +2,7 @@
  * Detail panel for a selected step: verdict, expected vs actual on failure,
  * agent summary, screenshot evidence and browser console evidence.
  */
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { EvidenceRef, Run } from "@greenlight/contracts";
 
 import { formatDuration } from "../lib/format.ts";
@@ -16,9 +16,10 @@ export interface StepDetailProps {
   onClose: () => void;
 }
 
+const EMPTY_EVIDENCE: ReadonlyArray<EvidenceRef> = [];
+
 const ConsoleEvidence = ({ entries }: { entries: ReadonlyArray<EvidenceRef> }) => {
   const [logsById, setLogsById] = useState<Readonly<Record<string, string>>>({});
-  const entryIds = entries.map((entry) => entry.id).join("|");
 
   useEffect(() => {
     let cancelled = false;
@@ -46,7 +47,7 @@ const ConsoleEvidence = ({ entries }: { entries: ReadonlyArray<EvidenceRef> }) =
     return () => {
       cancelled = true;
     };
-  }, [entryIds]);
+  }, [entries]);
 
   return (
     <section className="detail-section">
@@ -68,16 +69,22 @@ const ConsoleEvidence = ({ entries }: { entries: ReadonlyArray<EvidenceRef> }) =
 export const StepDetail = ({ run, selection, onClose }: StepDetailProps) => {
   const scenario = run.scenarios.find((entry) => entry.pickleId === selection.pickleId);
   const step = scenario?.steps.find((entry) => entry.index === selection.stepIndex);
+  const evidence = step?.evidence ?? EMPTY_EVIDENCE;
+  const { screenshots, consoleEvidence, otherEvidence } = useMemo(
+    () => ({
+      screenshots: evidence.filter((entry) => entry.kind === "screenshot"),
+      consoleEvidence: evidence.filter((entry) => entry.kind === "console"),
+      otherEvidence: evidence.filter(
+        (entry) => entry.kind !== "screenshot" && entry.kind !== "console",
+      ),
+    }),
+    [evidence],
+  );
 
   if (scenario === undefined || step === undefined) {
     return null;
   }
 
-  const screenshots = step.evidence.filter((entry) => entry.kind === "screenshot");
-  const consoleEvidence = step.evidence.filter((entry) => entry.kind === "console");
-  const otherEvidence = step.evidence.filter(
-    (entry) => entry.kind !== "screenshot" && entry.kind !== "console",
-  );
   const duration = formatDuration(step.startedAt, step.finishedAt);
 
   return (

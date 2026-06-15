@@ -5,8 +5,7 @@ import { make } from "./GherkinService.ts";
 
 const gherkin = make();
 
-const parse = (content: string) =>
-  Effect.runPromise(gherkin.parseFeature(content, "test.feature"));
+const parse = (content: string) => Effect.runPromise(gherkin.parseFeature(content, "test.feature"));
 
 describe("GherkinService", () => {
   it("parses scenarios with keywords preserved", async () => {

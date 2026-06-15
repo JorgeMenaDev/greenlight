@@ -12,7 +12,15 @@
  * deploy install matches what the bundle was built and tested against.
  */
 import { execSync } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import {
+  cpSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import path from "node:path";
 
 const serverDir = path.resolve(import.meta.dirname, "..");
@@ -20,7 +28,9 @@ const distDir = path.join(serverDir, "dist");
 const deployDir = path.join(serverDir, "deploy");
 
 if (!existsSync(path.join(distDir, "bin.mjs"))) {
-  console.error("apps/server/dist/bin.mjs not found. Run `pnpm --filter @greenlight/server build` first.");
+  console.error(
+    "apps/server/dist/bin.mjs not found. Run `pnpm --filter @greenlight/server build` first.",
+  );
   process.exit(1);
 }
 

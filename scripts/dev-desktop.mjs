@@ -60,7 +60,14 @@ const waitForVite = async () => {
 };
 
 console.log(`[dev-desktop] starting vite dev server on ${VITE_URL} ...`);
-run("vite", "pnpm", ["--filter", "@greenlight/web", "dev", "--port", String(VITE_PORT), "--strictPort"]);
+run("vite", "pnpm", [
+  "--filter",
+  "@greenlight/web",
+  "dev",
+  "--port",
+  String(VITE_PORT),
+  "--strictPort",
+]);
 
 const ready = await waitForVite();
 if (!ready) {
