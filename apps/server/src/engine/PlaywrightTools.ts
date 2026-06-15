@@ -40,6 +40,8 @@ export interface ToolContext {
   readonly onActivity: (activity: ToolActivity) => void;
   /** Persist a screenshot, returning a short identifier shown to the agent. */
   readonly saveScreenshot: (label: string, data: Uint8Array) => Promise<string>;
+  /** Browser console/page-error lines captured by the engine. */
+  readonly readConsoleMessages?: (() => ReadonlyArray<string>) | undefined;
   /** Verdict slot for the current step; reset by the engine before each step. */
   readonly verdict: VerdictSlot;
   /** Per-step tool-call budget; reset by the engine before each step. */
@@ -55,10 +57,13 @@ export const makePlaywrightTools = (ctx: ToolContext): ReadonlyArray<AgentTool> 
   const { page } = ctx;
 
   const consoleBuffer: Array<string> = [];
-  page.on("console", (message) => {
-    consoleBuffer.push(`[${message.type()}] ${message.text()}`);
-    if (consoleBuffer.length > 200) consoleBuffer.shift();
-  });
+  if (ctx.readConsoleMessages === undefined) {
+    page.on("console", (message) => {
+      consoleBuffer.push(`[${message.type()}] ${message.text()}`);
+      if (consoleBuffer.length > 200) consoleBuffer.shift();
+    });
+  }
+  const consoleMessages = (): ReadonlyArray<string> => ctx.readConsoleMessages?.() ?? consoleBuffer;
 
   const guarded = (
     tool: string,
@@ -92,7 +97,7 @@ export const makePlaywrightTools = (ctx: ToolContext): ReadonlyArray<AgentTool> 
   const refParams = {
     ref: {
       type: "string",
-      description: "Element reference from the latest browser_snapshot, e.g. \"e12\"",
+      description: 'Element reference from the latest browser_snapshot, e.g. "e12"',
     },
     element: {
       type: "string",
@@ -103,8 +108,7 @@ export const makePlaywrightTools = (ctx: ToolContext): ReadonlyArray<AgentTool> 
   const tools: Array<AgentTool> = [
     {
       name: "browser_navigate",
-      description:
-        "Navigate to a URL. Relative URLs resolve against the application under test.",
+      description: "Navigate to a URL. Relative URLs resolve against the application under test.",
       parameters: {
         type: "object",
         properties: { url: { type: "string" } },
@@ -334,7 +338,7 @@ export const makePlaywrightTools = (ctx: ToolContext): ReadonlyArray<AgentTool> 
         "browser_console_messages",
         () => "read console",
         async () =>
-          consoleBuffer.length === 0 ? "No console messages." : consoleBuffer.join("\n"),
+          consoleMessages().length === 0 ? "No console messages." : consoleMessages().join("\n"),
       ),
     },
     {

@@ -79,6 +79,4 @@ export const layerWsProtocol = (url: string) =>
  * @param url - The server base URL (http(s):// or ws(s)://).
  */
 export const layerGreenlightClient = (url: string) =>
-  Layer.effect(GreenlightRpcClient, makeGreenlightClient).pipe(
-    Layer.provide(layerWsProtocol(url)),
-  );
+  Layer.effect(GreenlightRpcClient, makeGreenlightClient).pipe(Layer.provide(layerWsProtocol(url)));

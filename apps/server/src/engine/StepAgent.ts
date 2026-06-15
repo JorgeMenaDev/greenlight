@@ -11,7 +11,7 @@ import * as Effect from "effect/Effect";
 
 import type { PickleStepInfo, StepVerdict } from "@greenlight/contracts";
 
-import type { AgentSession } from "../copilot/CopilotService.ts";
+import type { AgentSession, CopilotError } from "../copilot/CopilotService.ts";
 import type { VerdictSlot } from "./PlaywrightTools.ts";
 import { NUDGE_PROMPT, stepPrompt } from "./prompts.ts";
 
@@ -34,9 +34,12 @@ export interface ExecuteStepOptions {
 const failedVerdict = (summary: string): StepVerdict => ({ status: "failed", summary });
 
 /**
- * Never fails: agent/session errors become a failed verdict.
+ * Assertion failures are reported via `StepVerdict`; Copilot/session
+ * failures propagate so the run is marked as infrastructure error.
  */
-export const executeStep = (options: ExecuteStepOptions): Effect.Effect<StepVerdict> =>
+export const executeStep = (
+  options: ExecuteStepOptions,
+): Effect.Effect<StepVerdict, CopilotError> =>
   Effect.gen(function* () {
     options.verdict.current = null;
     options.budget.remaining = DEFAULT_STEP_TOOL_BUDGET;
@@ -56,6 +59,4 @@ export const executeStep = (options: ExecuteStepOptions): Effect.Effect<StepVerd
     }
 
     return options.verdict.current ?? failedVerdict("The agent did not report a verdict.");
-  }).pipe(
-    Effect.catch((error) => Effect.succeed(failedVerdict(`Agent error: ${error.message}`))),
-  );
+  });

@@ -100,11 +100,13 @@ export const make = Effect.gen(function* () {
       const entries: Array<FeatureFileEntry> = [];
       const walk = (dir: string): Effect.Effect<void, ProjectError> =>
         Effect.gen(function* () {
-          const names = yield* fs.readDirectory(dir).pipe(
-            Effect.mapError(
-              (cause) => new ProjectError({ detail: `Failed to read ${dir}: ${cause.message}` }),
-            ),
-          );
+          const names = yield* fs
+            .readDirectory(dir)
+            .pipe(
+              Effect.mapError(
+                (cause) => new ProjectError({ detail: `Failed to read ${dir}: ${cause.message}` }),
+              ),
+            );
           for (const name of names) {
             const fullPath = path.join(dir, name);
             const info = yield* fs.stat(fullPath).pipe(Effect.option);
@@ -133,9 +135,9 @@ export const make = Effect.gen(function* () {
   const open: ProjectServiceShape["open"] = (rawPath) =>
     Effect.gen(function* () {
       const root = path.resolve(rawPath);
-      const info = yield* fs.stat(root).pipe(
-        Effect.mapError(() => new ProjectError({ detail: `Folder not found: ${root}` })),
-      );
+      const info = yield* fs
+        .stat(root)
+        .pipe(Effect.mapError(() => new ProjectError({ detail: `Folder not found: ${root}` })));
       if (info.type !== "Directory") {
         return yield* Effect.fail(new ProjectError({ detail: `Not a folder: ${root}` }));
       }
@@ -178,22 +180,26 @@ export const make = Effect.gen(function* () {
     Effect.gen(function* () {
       const root = yield* requireProject;
       const fullPath = yield* resolveInside(root, relativePath);
-      return yield* fs.readFileString(fullPath).pipe(
-        Effect.mapError(
-          (cause) => new FeatureIoError({ path: relativePath, detail: cause.message }),
-        ),
-      );
+      return yield* fs
+        .readFileString(fullPath)
+        .pipe(
+          Effect.mapError(
+            (cause) => new FeatureIoError({ path: relativePath, detail: cause.message }),
+          ),
+        );
     });
 
   const writeFeature: ProjectServiceShape["writeFeature"] = (relativePath, content) =>
     Effect.gen(function* () {
       const root = yield* requireProject;
       const fullPath = yield* resolveInside(root, relativePath);
-      yield* fs.writeFileString(fullPath, content).pipe(
-        Effect.mapError(
-          (cause) => new FeatureIoError({ path: relativePath, detail: cause.message }),
-        ),
-      );
+      yield* fs
+        .writeFileString(fullPath, content)
+        .pipe(
+          Effect.mapError(
+            (cause) => new FeatureIoError({ path: relativePath, detail: cause.message }),
+          ),
+        );
     });
 
   const createFeature: ProjectServiceShape["createFeature"] = (name) =>
@@ -205,15 +211,22 @@ export const make = Effect.gen(function* () {
       const exists = yield* fs.exists(fullPath).pipe(Effect.orElseSucceed(() => false));
       if (exists) {
         return yield* Effect.fail(
-          new FeatureIoError({ path: fileName, detail: "A feature with this name already exists." }),
+          new FeatureIoError({
+            path: fileName,
+            detail: "A feature with this name already exists.",
+          }),
         );
       }
-      yield* fs.writeFileString(fullPath, FEATURE_TEMPLATE(safeName)).pipe(
-        Effect.mapError((cause) => new FeatureIoError({ path: fileName, detail: cause.message })),
-      );
-      const info = yield* fs.stat(fullPath).pipe(
-        Effect.mapError((cause) => new FeatureIoError({ path: fileName, detail: cause.message })),
-      );
+      yield* fs
+        .writeFileString(fullPath, FEATURE_TEMPLATE(safeName))
+        .pipe(
+          Effect.mapError((cause) => new FeatureIoError({ path: fileName, detail: cause.message })),
+        );
+      const info = yield* fs
+        .stat(fullPath)
+        .pipe(
+          Effect.mapError((cause) => new FeatureIoError({ path: fileName, detail: cause.message })),
+        );
       return {
         path: fileName,
         name: safeName,
@@ -226,11 +239,13 @@ export const make = Effect.gen(function* () {
     Effect.gen(function* () {
       const root = yield* requireProject;
       const fullPath = yield* resolveInside(root, relativePath);
-      yield* fs.remove(fullPath).pipe(
-        Effect.mapError(
-          (cause) => new FeatureIoError({ path: relativePath, detail: cause.message }),
-        ),
-      );
+      yield* fs
+        .remove(fullPath)
+        .pipe(
+          Effect.mapError(
+            (cause) => new FeatureIoError({ path: relativePath, detail: cause.message }),
+          ),
+        );
     });
 
   return {

@@ -12,15 +12,14 @@
     "build:server": "pnpm --filter @greenlight/server build",
     "deploy:server": "pnpm --filter @greenlight/server run deploy",
     "dist:mac": "pnpm run build:server && pnpm run deploy:server && pnpm --filter @greenlight/web build && pnpm --filter @greenlight/desktop build && pnpm --filter @greenlight/desktop run dist:mac",
-    "lint": "oxlint",
-    "fmt": "prettier --write .",
-    "fmt:check": "prettier --check ."
+    "lint": "biome lint .",
+    "fmt": "biome format --write .",
+    "fmt:check": "biome format ."
   },
   "devDependencies": {
+    "@biomejs/biome": "2.5.0",
     "@effect/language-service": "latest",
     "@types/node": "catalog:",
-    "oxlint": "^1.0.0",
-    "prettier": "^3.6.0",
     "typescript": "catalog:"
   },
   "engines": {

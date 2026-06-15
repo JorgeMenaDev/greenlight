@@ -45,18 +45,25 @@ const makeEventPrinter = (feature: ParsedFeature) => {
     switch (event.type) {
       case "run.started":
         return writeLine(
-          color.bold(`\nRunning ${event.run.scenarios.length} scenario(s) against ${event.run.baseUrl}\n`),
+          color.bold(
+            `\nRunning ${event.run.scenarios.length} scenario(s) against ${event.run.baseUrl}\n`,
+          ),
         );
       case "scenario.started":
-        return writeLine(color.bold(`Scenario: ${scenarioName.get(event.pickleId) ?? event.pickleId}`));
+        return writeLine(
+          color.bold(`Scenario: ${scenarioName.get(event.pickleId) ?? event.pickleId}`),
+        );
       case "step.started":
         return writeLine(
-          color.dim(`  … ${stepText.get(event.pickleId)?.[event.stepIndex] ?? `step ${event.stepIndex + 1}`}`),
+          color.dim(
+            `  … ${stepText.get(event.pickleId)?.[event.stepIndex] ?? `step ${event.stepIndex + 1}`}`,
+          ),
         );
       case "agent.activity":
         return writeLine(color.dim(`      · ${event.tool ?? "agent"}: ${event.summary}`));
       case "step.finished": {
-        const text = stepText.get(event.pickleId)?.[event.stepIndex] ?? `step ${event.stepIndex + 1}`;
+        const text =
+          stepText.get(event.pickleId)?.[event.stepIndex] ?? `step ${event.stepIndex + 1}`;
         switch (event.result.status) {
           case "passed":
             return writeLine(`  ${color.green("✓")} ${text}`);
@@ -139,9 +146,7 @@ export const demoProgram = (options: DemoOptions) =>
     }
     yield* writeLine(color.dim(`Copilot authenticated${auth.login ? ` as ${auth.login}` : ""}.`));
 
-    const runId = RunId.make(
-      `demo-${DateTime.toEpochMillis(yield* DateTime.now).toString(36)}`,
-    );
+    const runId = RunId.make(`demo-${DateTime.toEpochMillis(yield* DateTime.now).toString(36)}`);
 
     const run = yield* engine.executeRun({
       runId,

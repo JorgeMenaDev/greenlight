@@ -37,7 +37,7 @@ Because the agent interprets intent rather than matching step text, the same fea
 
 ```sh
 pnpm install
-npx playwright install chromium
+pnpm --filter @greenlight/server exec playwright install chromium
 ```
 
 ### Headless demo (no UI)

@@ -6,13 +6,21 @@
  *   deploy/
  *     dist/bin.mjs        the tsdown bundle (run `pnpm build` first)
  *     package.json        prod deps only = the bundle's externals
- *     node_modules/       real (non-symlinked) install via `npm install --omit=dev`
+ *     node_modules/       hoisted production install via pnpm
  *
  * Versions are pinned from what is actually installed in the workspace so the
  * deploy install matches what the bundle was built and tested against.
  */
 import { execSync } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import {
+  cpSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import path from "node:path";
 
 const serverDir = path.resolve(import.meta.dirname, "..");
@@ -20,7 +28,9 @@ const distDir = path.join(serverDir, "dist");
 const deployDir = path.join(serverDir, "deploy");
 
 if (!existsSync(path.join(distDir, "bin.mjs"))) {
-  console.error("apps/server/dist/bin.mjs not found. Run `pnpm --filter @greenlight/server build` first.");
+  console.error(
+    "apps/server/dist/bin.mjs not found. Run `pnpm --filter @greenlight/server build` first.",
+  );
   process.exit(1);
 }
 
@@ -76,10 +86,13 @@ writeFileSync(
 );
 
 console.log("Installing production dependencies into deploy/ ...");
-execSync("npm install --omit=dev --no-audit --no-fund --loglevel=error", {
-  cwd: deployDir,
-  stdio: "inherit",
-});
+execSync(
+  "pnpm install --prod --ignore-workspace --no-lockfile --config.node-linker=hoisted --config.package-import-method=copy --silent",
+  {
+    cwd: deployDir,
+    stdio: "inherit",
+  },
+);
 
 const mustExist = [
   "dist/bin.mjs",

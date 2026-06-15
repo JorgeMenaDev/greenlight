@@ -26,11 +26,13 @@ import {
   type ScenarioResult,
   type StepResult,
   type StepStatus,
+  type StepVerdict,
 } from "@greenlight/contracts";
 
 import { BrowserService } from "../browser/BrowserService.ts";
 import { CopilotService } from "../copilot/CopilotService.ts";
 import { EvidenceStore } from "../evidence/EvidenceStore.ts";
+import { makeBrowserDiagnostics } from "./BrowserDiagnostics.ts";
 import { makePlaywrightTools, type VerdictSlot } from "./PlaywrightTools.ts";
 import { executeStep } from "./StepAgent.ts";
 import { SYSTEM_MESSAGE } from "./prompts.ts";
@@ -65,6 +67,22 @@ const pendingSteps = (scenario: ParsedScenario): Array<StepResult> =>
     status: "pending" as const,
     evidence: [],
   }));
+
+const stepResultFromVerdict = (
+  step: StepResult,
+  verdict: StepVerdict,
+  finishedAt: string,
+  evidence: ReadonlyArray<EvidenceRef>,
+): StepResult => ({
+  ...step,
+  status: verdict.status,
+  finishedAt,
+  agentSummary: verdict.summary,
+  ...(verdict.expected !== undefined ? { expected: verdict.expected } : {}),
+  ...(verdict.actual !== undefined ? { actual: verdict.actual } : {}),
+  ...(verdict.status === "failed" ? { errorMessage: verdict.summary } : {}),
+  evidence: [...evidence],
+});
 
 export const make = Effect.gen(function* () {
   const browser = yield* BrowserService;
@@ -128,6 +146,11 @@ export const make = Effect.gen(function* () {
                 ? { httpCredentials: options.httpCredentials }
                 : undefined,
             );
+            const diagnostics = makeBrowserDiagnostics({
+              page,
+              evidenceStore,
+              runId: options.runId,
+            });
             yield* Effect.tryPromise({
               try: () => page.goto(options.baseUrl, { timeout: 30_000 }),
               catch: (cause) =>
@@ -140,7 +163,8 @@ export const make = Effect.gen(function* () {
 
             const verdict: VerdictSlot = { current: null };
             const budget = { remaining: 0 };
-            const emitActivity = (pickleId: PickleId, stepIndex: number) =>
+            const emitActivity =
+              (pickleId: PickleId, stepIndex: number) =>
               (activity: { tool: string; summary: string }) => {
                 Effect.runFork(
                   emit({
@@ -161,6 +185,7 @@ export const make = Effect.gen(function* () {
               onActivity: (activity) =>
                 emitActivity(scenario.pickleId, activityTarget.stepIndex)(activity),
               saveScreenshot,
+              readConsoleMessages: diagnostics.readConsoleMessages,
               verdict,
               budget,
             });
@@ -173,6 +198,18 @@ export const make = Effect.gen(function* () {
 
             const steps = scenarioResults[scenarioIndex]!.steps as Array<StepResult>;
             let failed = false;
+
+            const finishScenario = (status: StepStatus, finishedAt: string) =>
+              Effect.gen(function* () {
+                scenarioResults[scenarioIndex] = {
+                  ...scenarioResults[scenarioIndex]!,
+                  status,
+                  startedAt,
+                  finishedAt,
+                  steps,
+                };
+                yield* emit({ type: "scenario.finished", pickleId: scenario.pickleId, status });
+              });
 
             for (let stepIndex = 0; stepIndex < scenario.steps.length; stepIndex++) {
               const step = scenario.steps[stepIndex]!;
@@ -190,7 +227,11 @@ export const make = Effect.gen(function* () {
               }
 
               const stepStartedAt = yield* nowIso;
-              steps[stepIndex] = { ...steps[stepIndex]!, status: "running", startedAt: stepStartedAt };
+              steps[stepIndex] = {
+                ...steps[stepIndex]!,
+                status: "running",
+                startedAt: stepStartedAt,
+              };
               yield* emit({ type: "step.started", pickleId: scenario.pickleId, stepIndex });
 
               const stepVerdict = yield* executeStep({
@@ -202,35 +243,43 @@ export const make = Effect.gen(function* () {
                 baseUrl: options.baseUrl,
                 verdict,
                 budget,
-              });
-
-              // Engine-captured screenshot: evidence even when the agent
-              // didn't take one (or lied).
-              const evidence: Array<EvidenceRef> = [];
-              const screenshotData = yield* Effect.promise(() =>
-                page.screenshot({ type: "png" }).catch(() => undefined),
+              }).pipe(
+                Effect.match({
+                  onSuccess: (verdict) => ({ type: "verdict", verdict }) as const,
+                  onFailure: (error) =>
+                    ({
+                      type: "agent-error",
+                      message: `Agent error: ${error.message}`,
+                    }) as const,
+                }),
               );
-              if (screenshotData !== undefined) {
-                evidence.push(
-                  yield* evidenceStore.saveScreenshot(
-                    options.runId,
-                    `After step ${stepIndex + 1}`,
-                    screenshotData,
-                  ),
+
+              const evidence = yield* diagnostics.captureStepEvidence(stepIndex + 1);
+              const finishedAt = yield* nowIso;
+
+              if (stepVerdict.type === "agent-error") {
+                steps[stepIndex] = stepResultFromVerdict(
+                  steps[stepIndex]!,
+                  { status: "failed", summary: stepVerdict.message },
+                  finishedAt,
+                  evidence,
                 );
+                yield* emit({
+                  type: "step.finished",
+                  pickleId: scenario.pickleId,
+                  stepIndex,
+                  result: steps[stepIndex]!,
+                });
+                yield* finishScenario("failed", finishedAt);
+                return yield* Effect.fail(new Error(stepVerdict.message));
               }
 
-              const finishedAt = yield* nowIso;
-              steps[stepIndex] = {
-                ...steps[stepIndex]!,
-                status: stepVerdict.status,
+              steps[stepIndex] = stepResultFromVerdict(
+                steps[stepIndex]!,
+                stepVerdict.verdict,
                 finishedAt,
-                agentSummary: stepVerdict.summary,
-                ...(stepVerdict.expected !== undefined ? { expected: stepVerdict.expected } : {}),
-                ...(stepVerdict.actual !== undefined ? { actual: stepVerdict.actual } : {}),
-                ...(stepVerdict.status === "failed" ? { errorMessage: stepVerdict.summary } : {}),
                 evidence,
-              };
+              );
               yield* emit({
                 type: "step.finished",
                 pickleId: scenario.pickleId,
@@ -238,26 +287,24 @@ export const make = Effect.gen(function* () {
                 result: steps[stepIndex]!,
               });
 
-              if (stepVerdict.status === "failed") failed = true;
+              if (stepVerdict.verdict.status === "failed") failed = true;
             }
 
             const status: StepStatus = failed ? "failed" : "passed";
             const finishedAt = yield* nowIso;
-            scenarioResults[scenarioIndex] = {
-              ...scenarioResults[scenarioIndex]!,
-              status,
-              startedAt,
-              finishedAt,
-              steps,
-            };
-            yield* emit({ type: "scenario.finished", pickleId: scenario.pickleId, status });
+            yield* finishScenario(status, finishedAt);
           }),
         );
 
       for (let index = 0; index < options.scenarios.length; index++) {
-        const failure: string | undefined = yield* runScenario(options.scenarios[index]!, index).pipe(
+        const failure: string | undefined = yield* runScenario(
+          options.scenarios[index]!,
+          index,
+        ).pipe(
           Effect.as(undefined),
-          Effect.catch((error) => Effect.succeed(error.message)),
+          Effect.catch((error) =>
+            Effect.succeed(error instanceof Error ? error.message : String(error)),
+          ),
         );
         if (failure !== undefined) {
           runError = failure;

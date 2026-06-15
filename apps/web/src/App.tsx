@@ -69,7 +69,12 @@ const RunPanel = () => {
       {runError !== undefined && (
         <div className="banner banner-error">
           <span>{runError}</span>
-          <button type="button" className="banner-dismiss" onClick={clearError} aria-label="Dismiss">
+          <button
+            type="button"
+            className="banner-dismiss"
+            onClick={clearError}
+            aria-label="Dismiss"
+          >
             ×
           </button>
         </div>

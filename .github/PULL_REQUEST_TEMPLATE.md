@@ -1,15 +1,30 @@
-## What & why
+## Summary
 
-<!-- Summary of the change and its motivation. Link related issues. -->
+<!-- Concisely describe what this PR changes and why. Focus on impact and
+urgency. -->
 
-## How I verified it
+## Details
 
-<!-- No automated tests in this repo (project policy) — describe the manual verification you did.
-     For engine changes, the usual check is the headless demo:
-     pnpm --filter @greenlight/server exec node src/bin.ts demo ../../examples/todomvc/todo.feature --url https://demo.playwright.dev/todomvc -->
+<!-- Add any extra context and design decisions. Keep it brief but complete. -->
 
-## Checklist
+## Related Issues
 
-- [ ] `pnpm typecheck` passes
-- [ ] `pnpm lint` and `pnpm fmt:check` pass
-- [ ] Protocol changes (if any) made in `packages/contracts` with both sides updated
+<!-- Use keywords to auto-close issues (Closes #123, Fixes #456). If this PR is
+only related to an issue or is a partial fix, simply reference the issue number
+without a keyword (Related to #123). -->
+
+## How to Validate
+
+<!-- List exact steps for reviewers to validate the change. Include commands,
+expected results, and edge cases. -->
+
+## Pre-Merge Checklist
+
+<!-- Check all that apply before requesting review or merging. -->
+
+- [ ] Updated relevant documentation and README (if needed)
+- [ ] Did not add or modify `.test` files unless explicitly requested
+- [ ] Noted breaking changes (if any)
+- [ ] Ran relevant pnpm checks (`pnpm typecheck`, `pnpm lint`, `pnpm fmt:check`)
+- [ ] Validated UI-facing changes through Browser, Helium, or Chrome instead of Playwright
+- [ ] For engine changes, ran the headless demo or another existing non-test workflow
