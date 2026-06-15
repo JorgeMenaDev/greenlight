@@ -98,6 +98,9 @@ export const HistoryList = () => {
                     {baseName(entry.featurePath)}
                   </span>
                   <span className="history-target" title={entry.baseUrl}>
+                    {entry.environmentProfileName !== undefined && (
+                      <span className="history-profile">{entry.environmentProfileName}</span>
+                    )}
                     {entry.baseUrl}
                   </span>
                   <span className="history-counts">

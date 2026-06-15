@@ -74,6 +74,17 @@ const setup = Layer.effectDiscard(
         value TEXT NOT NULL
       )
     `;
+
+    yield* sql`
+      CREATE TABLE IF NOT EXISTS environment_profile_credentials (
+        project_path TEXT NOT NULL,
+        auth_ref TEXT NOT NULL,
+        username TEXT NOT NULL,
+        password TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        PRIMARY KEY (project_path, auth_ref)
+      )
+    `;
   }),
 );
 

@@ -925,6 +925,11 @@ a {
   flex: 1;
 }
 
+.run-view-profile {
+  color: var(--accent);
+  margin-right: 0.45rem;
+}
+
 .run-view-duration,
 .run-scenario-duration,
 .run-step-duration {
@@ -1331,6 +1336,11 @@ a {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.history-profile {
+  color: var(--accent);
+  margin-right: 0.4rem;
 }
 
 .history-counts {

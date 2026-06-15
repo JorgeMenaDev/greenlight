@@ -32,6 +32,7 @@ const DEFAULT_PROJECT_FEATURE = "todo.feature";
 export interface ProjectServiceShape {
   readonly open: (path: string) => Effect.Effect<ProjectInfo, ProjectError>;
   readonly current: Effect.Effect<ProjectInfo | null>;
+  readonly currentPath: Effect.Effect<string, NoProjectOpenError>;
   readonly recent: Effect.Effect<ReadonlyArray<RecentProject>>;
   readonly listFeatures: Effect.Effect<
     ReadonlyArray<FeatureFileEntry>,
@@ -285,6 +286,7 @@ export const make = Effect.gen(function* () {
   return {
     open,
     current,
+    currentPath: requireProject,
     recent,
     listFeatures,
     readFeature,

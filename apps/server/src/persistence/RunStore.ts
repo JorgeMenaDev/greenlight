@@ -48,6 +48,9 @@ const toSummary = (run: Run): RunSummary => ({
   runId: run.runId,
   featurePath: run.featurePath,
   baseUrl: run.baseUrl,
+  ...(run.environmentProfileName !== undefined
+    ? { environmentProfileName: run.environmentProfileName }
+    : {}),
   status: run.status,
   createdAt: run.createdAt,
   ...(run.finishedAt !== undefined ? { finishedAt: run.finishedAt } : {}),

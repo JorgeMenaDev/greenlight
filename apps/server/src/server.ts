@@ -17,6 +17,7 @@ import { HttpRouter, HttpServer } from "effect/unstable/http";
 import { BrowserServiceLive } from "./browser/BrowserService.ts";
 import { ServerConfig } from "./config.ts";
 import { CopilotServiceLive } from "./copilot/CopilotService.ts";
+import { EnvironmentProfileServiceLive } from "./environment/EnvironmentProfileService.ts";
 import { EvidenceStoreLive } from "./evidence/EvidenceStore.ts";
 import { GherkinServiceLive } from "./gherkin/GherkinService.ts";
 import { RunEngineLive } from "./engine/RunEngine.ts";
@@ -50,7 +51,8 @@ const logListeningLayer = Layer.effectDiscard(
 export const servicesLayer = RunManagerLive.pipe(
   Layer.provideMerge(RunEngineLive),
   Layer.provideMerge(Layer.mergeAll(BrowserServiceLive, CopilotServiceLive, GherkinServiceLive)),
-  Layer.provideMerge(Layer.mergeAll(RunEventBusLive, ProjectServiceLive)),
+  Layer.provideMerge(Layer.mergeAll(RunEventBusLive, EnvironmentProfileServiceLive)),
+  Layer.provideMerge(ProjectServiceLive),
   Layer.provideMerge(Layer.mergeAll(RunStoreLive, EvidenceStoreLive)),
   Layer.provideMerge(SqliteLive),
 );

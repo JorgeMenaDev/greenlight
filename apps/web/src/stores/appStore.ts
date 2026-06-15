@@ -1,6 +1,6 @@
 /**
  * Global application state: connection lifecycle, environment statuses,
- * the open project, feature files and run configuration.
+ * the open project, feature files and available Copilot models.
  */
 import type {
   BrowserStatus,
@@ -13,35 +13,10 @@ import type {
 import { create } from "zustand";
 
 import { errorMessage, rpc, rpcWithTimeout, type FeatureParse } from "../rpc/client.ts";
+import { useRunConfigStore } from "./runConfigStore.ts";
 
 export type ConnectionState = "connecting" | "connected" | "error";
 export type AppView = "project" | "workspace" | "history";
-
-const targetUrlKey = (projectPath: string): string => `greenlight:targetUrl:${projectPath}`;
-const TODO_MVC_TARGET_URL = "https://demo.playwright.dev/todomvc";
-
-const defaultTargetUrl = (projectPath: string) => {
-  const normalized = projectPath.replaceAll("\\", "/");
-  return normalized === "examples/todomvc" || normalized.endsWith("/examples/todomvc")
-    ? TODO_MVC_TARGET_URL
-    : "";
-};
-
-const readTargetUrl = (projectPath: string): string => {
-  try {
-    return window.localStorage.getItem(targetUrlKey(projectPath)) ?? defaultTargetUrl(projectPath);
-  } catch {
-    return defaultTargetUrl(projectPath);
-  }
-};
-
-const writeTargetUrl = (projectPath: string, url: string): void => {
-  try {
-    window.localStorage.setItem(targetUrlKey(projectPath), url);
-  } catch {
-    // localStorage unavailable - non fatal
-  }
-};
 
 export interface AppState {
   connection: ConnectionState;
@@ -63,11 +38,6 @@ export interface AppState {
   parsed: FeatureParse | null;
 
   models: ReadonlyArray<CopilotModel>;
-  targetUrl: string;
-  authUsername: string;
-  authPassword: string;
-  /** Selected Copilot model id; "" means the server default. */
-  model: string;
 
   bootstrap: () => Promise<void>;
   recheckStatuses: () => Promise<void>;
@@ -80,11 +50,16 @@ export interface AppState {
   createFeature: (name: string) => Promise<string | null>;
   deleteFeature: (path: string) => Promise<string | null>;
   loadModels: () => Promise<void>;
-  setTargetUrl: (url: string) => void;
-  setAuthUsername: (username: string) => void;
-  setAuthPassword: (password: string) => void;
-  setModel: (model: string) => void;
 }
+
+const loadProjectConfig = (project: ProjectInfo | null) => {
+  const runConfig = useRunConfigStore.getState();
+  if (project === null) {
+    runConfig.reset();
+    return;
+  }
+  void runConfig.loadForProject(project.path);
+};
 
 export const useAppStore = create<AppState>()((set, get) => ({
   connection: "connecting",
@@ -105,10 +80,6 @@ export const useAppStore = create<AppState>()((set, get) => ({
   parsed: null,
 
   models: [],
-  targetUrl: "",
-  authUsername: "",
-  authPassword: "",
-  model: "",
 
   bootstrap: async () => {
     set({ connection: "connecting", connectionError: undefined });
@@ -126,11 +97,9 @@ export const useAppStore = create<AppState>()((set, get) => ({
         copilotStatus,
         browserStatus,
         project,
-        targetUrl: project !== null ? readTargetUrl(project.path) : "",
-        authUsername: "",
-        authPassword: "",
         view: project !== null ? "workspace" : "project",
       });
+      loadProjectConfig(project);
       if (project !== null) {
         void get().loadFeatures();
         void get().loadModels();
@@ -167,10 +136,8 @@ export const useAppStore = create<AppState>()((set, get) => ({
         featuresError: undefined,
         selectedFeaturePath: undefined,
         parsed: null,
-        targetUrl: readTargetUrl(project.path),
-        authUsername: "",
-        authPassword: "",
       });
+      loadProjectConfig(project);
       void get().loadFeatures();
       void get().loadModels();
       return null;
@@ -237,18 +204,6 @@ export const useAppStore = create<AppState>()((set, get) => ({
       set({ models: [] });
     }
   },
-
-  setTargetUrl: (url) => {
-    const { project } = get();
-    if (project !== null) writeTargetUrl(project.path, url);
-    set({ targetUrl: url });
-  },
-
-  setAuthUsername: (username) => set({ authUsername: username }),
-
-  setAuthPassword: (password) => set({ authPassword: password }),
-
-  setModel: (model) => set({ model }),
 }));
 
 /** True when the environment is not ready and onboarding should be shown. */

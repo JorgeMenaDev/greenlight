@@ -11,11 +11,18 @@ import * as Schema from "effect/Schema";
 import * as Rpc from "effect/unstable/rpc/Rpc";
 import * as RpcGroup from "effect/unstable/rpc/RpcGroup";
 
+import { BasicAuthCredentials } from "./auth.ts";
 import { BrowserStatus } from "./browser.ts";
 import { CopilotAuthStatus, CopilotModel, CopilotUnavailableError } from "./copilot.ts";
+import {
+  EnvironmentProfile,
+  EnvironmentProfileError,
+  EnvironmentProfileInput,
+  LocalAuthCredentialStatus,
+} from "./environmentProfiles.ts";
 import { RunEvent } from "./events.ts";
 import { FeatureFileEntry, GherkinParseError, ParsedFeature } from "./feature.ts";
-import { PickleId, RunId } from "./ids.ts";
+import { EnvironmentProfileId, PickleId, RunId } from "./ids.ts";
 import {
   FeatureIoError,
   NoProjectOpenError,
@@ -25,6 +32,7 @@ import {
 } from "./project.ts";
 import { Run, RunSummary } from "./run.ts";
 import { ServerInfo } from "./server.ts";
+import { RunTarget } from "./targets.ts";
 
 export class RunNotFoundError extends Schema.TaggedErrorClass<RunNotFoundError>()(
   "RunNotFoundError",
@@ -58,6 +66,14 @@ export const WS_METHODS = {
   projectCurrent: "project.current",
   projectRecent: "project.recent",
 
+  // Environment profiles
+  environmentProfilesList: "environmentProfiles.list",
+  environmentProfilesSave: "environmentProfiles.save",
+  environmentProfilesDelete: "environmentProfiles.delete",
+  environmentProfileCredentialsList: "environmentProfileCredentials.list",
+  environmentProfileCredentialsSave: "environmentProfileCredentials.save",
+  environmentProfileCredentialsDelete: "environmentProfileCredentials.delete",
+
   // Feature files
   featuresList: "features.list",
   featuresRead: "features.read",
@@ -89,12 +105,6 @@ const FeatureParse = Schema.Struct({
   errors: Schema.Array(GherkinParseError),
 });
 
-export const BasicAuthCredentials = Schema.Struct({
-  username: Schema.String,
-  password: Schema.String,
-});
-export type BasicAuthCredentials = typeof BasicAuthCredentials.Type;
-
 export const WsProjectOpenRpc = Rpc.make(WS_METHODS.projectOpen, {
   payload: Schema.Struct({ path: Schema.String }),
   success: ProjectInfo,
@@ -110,6 +120,57 @@ export const WsProjectRecentRpc = Rpc.make(WS_METHODS.projectRecent, {
   payload: Schema.Struct({}),
   success: Schema.Array(RecentProject),
 });
+
+export const WsEnvironmentProfilesListRpc = Rpc.make(WS_METHODS.environmentProfilesList, {
+  payload: Schema.Struct({}),
+  success: Schema.Array(EnvironmentProfile),
+  error: Schema.Union([NoProjectOpenError, EnvironmentProfileError]),
+});
+
+export const WsEnvironmentProfilesSaveRpc = Rpc.make(WS_METHODS.environmentProfilesSave, {
+  payload: EnvironmentProfileInput,
+  success: EnvironmentProfile,
+  error: Schema.Union([NoProjectOpenError, EnvironmentProfileError]),
+});
+
+export const WsEnvironmentProfilesDeleteRpc = Rpc.make(WS_METHODS.environmentProfilesDelete, {
+  payload: Schema.Struct({
+    id: EnvironmentProfileId,
+    deleteLocalCredentials: Schema.optional(Schema.Boolean),
+  }),
+  success: Schema.Struct({}),
+  error: Schema.Union([NoProjectOpenError, EnvironmentProfileError]),
+});
+
+export const WsEnvironmentProfileCredentialsListRpc = Rpc.make(
+  WS_METHODS.environmentProfileCredentialsList,
+  {
+    payload: Schema.Struct({}),
+    success: Schema.Array(LocalAuthCredentialStatus),
+    error: NoProjectOpenError,
+  },
+);
+
+export const WsEnvironmentProfileCredentialsSaveRpc = Rpc.make(
+  WS_METHODS.environmentProfileCredentialsSave,
+  {
+    payload: Schema.Struct({
+      authRef: Schema.String,
+      credentials: BasicAuthCredentials,
+    }),
+    success: Schema.Struct({}),
+    error: Schema.Union([NoProjectOpenError, EnvironmentProfileError]),
+  },
+);
+
+export const WsEnvironmentProfileCredentialsDeleteRpc = Rpc.make(
+  WS_METHODS.environmentProfileCredentialsDelete,
+  {
+    payload: Schema.Struct({ authRef: Schema.String }),
+    success: Schema.Struct({}),
+    error: Schema.Union([NoProjectOpenError, EnvironmentProfileError]),
+  },
+);
 
 export const WsFeaturesListRpc = Rpc.make(WS_METHODS.featuresList, {
   payload: Schema.Struct({}),
@@ -144,8 +205,7 @@ export const WsFeaturesDeleteRpc = Rpc.make(WS_METHODS.featuresDelete, {
 export const WsRunStartRpc = Rpc.make(WS_METHODS.runStart, {
   payload: Schema.Struct({
     featurePath: Schema.String,
-    baseUrl: Schema.String,
-    httpCredentials: Schema.optional(BasicAuthCredentials),
+    target: RunTarget,
     pickleIds: Schema.optional(Schema.Array(PickleId)),
     model: Schema.optional(Schema.String),
   }),
@@ -215,6 +275,12 @@ export const WsRpcGroup = RpcGroup.make(
   WsProjectOpenRpc,
   WsProjectCurrentRpc,
   WsProjectRecentRpc,
+  WsEnvironmentProfilesListRpc,
+  WsEnvironmentProfilesSaveRpc,
+  WsEnvironmentProfilesDeleteRpc,
+  WsEnvironmentProfileCredentialsListRpc,
+  WsEnvironmentProfileCredentialsSaveRpc,
+  WsEnvironmentProfileCredentialsDeleteRpc,
   WsFeaturesListRpc,
   WsFeaturesReadRpc,
   WsFeaturesWriteRpc,

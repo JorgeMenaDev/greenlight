@@ -24,12 +24,13 @@ import {
   RunId,
   RunNotFoundError,
   RunStartError,
-  type BasicAuthCredentials,
   type PickleId,
   type Run,
   type RunEvent,
+  type RunTarget,
 } from "@greenlight/contracts";
 
+import { EnvironmentProfileService } from "../environment/EnvironmentProfileService.ts";
 import { GherkinService } from "../gherkin/GherkinService.ts";
 import { ProjectService } from "../project/ProjectService.ts";
 import { RunStore } from "../persistence/RunStore.ts";
@@ -38,8 +39,7 @@ import { RunEventBus } from "./RunEventBus.ts";
 
 export interface StartRunOptions {
   readonly featurePath: string;
-  readonly baseUrl: string;
-  readonly httpCredentials?: BasicAuthCredentials | undefined;
+  readonly target: RunTarget;
   readonly pickleIds?: ReadonlyArray<PickleId> | undefined;
   readonly model?: string | undefined;
 }
@@ -66,6 +66,7 @@ interface ActiveRun {
 export const make = Effect.gen(function* () {
   const layerScope = yield* Effect.service(Scope.Scope);
   const project = yield* ProjectService;
+  const environmentProfiles = yield* EnvironmentProfileService;
   const gherkin = yield* GherkinService;
   const engine = yield* RunEngine;
   const store = yield* RunStore;
@@ -78,6 +79,10 @@ export const make = Effect.gen(function* () {
       if (active !== undefined) {
         return yield* Effect.fail(new RunAlreadyActiveError({ activeRunId: active.runId }));
       }
+
+      const target = yield* environmentProfiles
+        .resolveRunTarget(options.target)
+        .pipe(Effect.mapError((error) => new RunStartError({ detail: error.message })));
 
       const content = yield* project.readFeature(options.featurePath);
       const { feature, errors } = yield* gherkin.parseFeature(content, options.featurePath);
@@ -125,8 +130,13 @@ export const make = Effect.gen(function* () {
         .executeRun({
           runId,
           featurePath: options.featurePath,
-          baseUrl: options.baseUrl,
-          httpCredentials: options.httpCredentials,
+          baseUrl: target.baseUrl,
+          ...(target.environmentProfileName !== undefined
+            ? { environmentProfileName: target.environmentProfileName }
+            : {}),
+          ...(target.httpCredentials !== undefined
+            ? { httpCredentials: target.httpCredentials }
+            : {}),
           model: options.model,
           scenarios,
           onEvent,

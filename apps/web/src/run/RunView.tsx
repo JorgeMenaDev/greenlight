@@ -39,6 +39,9 @@ export const RunView = ({ run, live, activity, selectedStep, onSelectStep }: Run
     <div className="run-view-head">
       <RunStatusBadge status={run.status} />
       <span className="run-view-target" title={run.baseUrl}>
+        {run.environmentProfileName !== undefined && (
+          <span className="run-view-profile">{run.environmentProfileName}</span>
+        )}
         {run.baseUrl}
       </span>
       <span className="run-view-duration">

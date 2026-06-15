@@ -5,15 +5,18 @@
 import {
   applyRunEvent,
   type BasicAuthCredentials,
+  parseHttpTargetUrl,
   type PickleId,
   type Run,
   type RunEvent,
   type RunId,
+  type RunTarget,
 } from "@greenlight/contracts";
 import { create } from "zustand";
 
 import { errorMessage, rpc, subscribeRun } from "../rpc/client.ts";
 import { useAppStore } from "./appStore.ts";
+import { useRunConfigStore } from "./runConfigStore.ts";
 
 export interface StepActivity {
   summary: string;
@@ -30,8 +33,7 @@ export const activityKey = (pickleId: PickleId, stepIndex: number): string =>
 
 export interface StartRunParams {
   featurePath: string;
-  baseUrl: string;
-  httpCredentials?: BasicAuthCredentials;
+  target: RunTarget;
   pickleIds?: ReadonlyArray<PickleId>;
   model?: string;
 }
@@ -154,39 +156,69 @@ export const useRunStore = create<RunState>()((set, get) => ({
 }));
 
 /**
- * Start a run for the currently selected feature using the run config in
- * the app store (target URL, model). Pass `pickleIds` to run a subset of
+ * Start a run for the currently selected feature using the run config store.
+ * Pass `pickleIds` to run a subset of
  * scenarios; omit it to run the whole feature.
  */
 export const startRunWithConfig = (pickleIds?: ReadonlyArray<PickleId>): void => {
   const app = useAppStore.getState();
+  const config = useRunConfigStore.getState();
   const featurePath = app.selectedFeaturePath;
-  const baseUrl = app.targetUrl.trim();
-  const authUsername = app.authUsername.trim();
-  const authPassword = app.authPassword;
-  const hasUsername = authUsername !== "";
-  const hasPassword = authPassword !== "";
   if (featurePath === undefined) {
     useRunStore.setState({ runError: "Select a feature file first." });
     return;
   }
-  if (baseUrl === "") {
-    useRunStore.setState({ runError: "Set a target URL in the toolbar first." });
+
+  const target = buildRunTarget(config);
+  if (typeof target === "string") {
+    useRunStore.setState({ runError: target });
     return;
   }
-  if (hasUsername !== hasPassword) {
-    useRunStore.setState({
-      runError: "Enter both basic auth username and password, or leave both blank.",
-    });
-    return;
-  }
-  const httpCredentials: BasicAuthCredentials | undefined =
-    hasUsername && hasPassword ? { username: authUsername, password: authPassword } : undefined;
+
   void useRunStore.getState().startRun({
     featurePath,
-    baseUrl,
-    ...(httpCredentials !== undefined ? { httpCredentials } : {}),
+    target,
     ...(pickleIds !== undefined ? { pickleIds } : {}),
-    ...(app.model !== "" ? { model: app.model } : {}),
+    ...(config.model !== "" ? { model: config.model } : {}),
   });
+};
+
+const buildRunTarget = (
+  config: ReturnType<typeof useRunConfigStore.getState>,
+): RunTarget | string => {
+  const targetSelection = config.targetSelection;
+  if (targetSelection.kind === "environmentProfile") {
+    const profile = config.environmentProfiles.find(
+      (entry) => entry.id === targetSelection.environmentProfileId,
+    );
+    if (profile === undefined) return "Selected environment profile is no longer available.";
+    if (
+      profile.authRef !== undefined &&
+      config.localAuthCredentialStatus[profile.authRef] !== true
+    ) {
+      return `Local credentials missing for ${profile.authRef}.`;
+    }
+    return {
+      kind: "environmentProfile",
+      environmentProfileId: profile.id,
+    };
+  }
+
+  const parsed = parseHttpTargetUrl(config.adHocTargetUrl);
+  if ("error" in parsed) return parsed.error;
+
+  const username = config.adHocAuthUsername.trim();
+  const password = config.adHocAuthPassword;
+  const hasUsername = username !== "";
+  const hasPassword = password !== "";
+  if (hasUsername !== hasPassword) {
+    return "Enter both basic auth username and password, or leave both blank.";
+  }
+  const httpCredentials: BasicAuthCredentials | undefined =
+    hasUsername && hasPassword ? { username, password } : undefined;
+  return {
+    kind: "adHoc",
+    baseUrl: parsed.targetUrl,
+    ...(httpCredentials !== undefined ? { httpCredentials } : {}),
+  };
 };

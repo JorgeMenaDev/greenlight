@@ -1,5 +1,7 @@
+export * from "./auth.ts";
 export * from "./browser.ts";
 export * from "./copilot.ts";
+export * from "./environmentProfiles.ts";
 export * from "./events.ts";
 export * from "./project.ts";
 export * from "./feature.ts";
@@ -8,3 +10,4 @@ export * from "./rpc.ts";
 export * from "./run.ts";
 export * from "./runReducer.ts";
 export * from "./server.ts";
+export * from "./targets.ts";

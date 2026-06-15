@@ -24,3 +24,6 @@ export type PickleId = typeof PickleId.Type;
 
 export const EvidenceId = makeEntityId("EvidenceId");
 export type EvidenceId = typeof EvidenceId.Type;
+
+export const EnvironmentProfileId = makeEntityId("EnvironmentProfileId");
+export type EnvironmentProfileId = typeof EnvironmentProfileId.Type;

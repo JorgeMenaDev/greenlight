@@ -18,8 +18,12 @@ import type {
   BasicAuthCredentials,
   CopilotAuthStatus,
   CopilotModel,
+  EnvironmentProfile,
+  EnvironmentProfileId,
+  EnvironmentProfileInput,
   FeatureFileEntry,
   GherkinParseError,
+  LocalAuthCredentialStatus,
   ParsedFeature,
   PickleId,
   ProjectInfo,
@@ -28,6 +32,7 @@ import type {
   RunEvent,
   RunId,
   RunSummary,
+  RunTarget,
   ServerInfo,
 } from "@greenlight/contracts";
 import * as Context from "effect/Context";
@@ -73,6 +78,30 @@ export interface RpcMethodMap {
   "project.open": { payload: { path: string }; result: ProjectInfo };
   "project.current": { payload: Record<string, never>; result: ProjectInfo | null };
   "project.recent": { payload: Record<string, never>; result: ReadonlyArray<RecentProject> };
+  "environmentProfiles.list": {
+    payload: Record<string, never>;
+    result: ReadonlyArray<EnvironmentProfile>;
+  };
+  "environmentProfiles.save": {
+    payload: EnvironmentProfileInput;
+    result: EnvironmentProfile;
+  };
+  "environmentProfiles.delete": {
+    payload: { id: EnvironmentProfileId; deleteLocalCredentials?: boolean };
+    result: Record<string, never>;
+  };
+  "environmentProfileCredentials.list": {
+    payload: Record<string, never>;
+    result: ReadonlyArray<LocalAuthCredentialStatus>;
+  };
+  "environmentProfileCredentials.save": {
+    payload: { authRef: string; credentials: BasicAuthCredentials };
+    result: Record<string, never>;
+  };
+  "environmentProfileCredentials.delete": {
+    payload: { authRef: string };
+    result: Record<string, never>;
+  };
   "features.list": { payload: Record<string, never>; result: ReadonlyArray<FeatureFileEntry> };
   "features.read": {
     payload: { path: string };
@@ -87,8 +116,7 @@ export interface RpcMethodMap {
   "run.start": {
     payload: {
       featurePath: string;
-      baseUrl: string;
-      httpCredentials?: BasicAuthCredentials;
+      target: RunTarget;
       pickleIds?: ReadonlyArray<PickleId>;
       model?: string;
     };

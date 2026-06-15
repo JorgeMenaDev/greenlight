@@ -41,6 +41,7 @@ export interface ExecuteRunOptions {
   readonly runId: RunId;
   readonly featurePath: string;
   readonly baseUrl: string;
+  readonly environmentProfileName?: string | undefined;
   readonly httpCredentials?: BasicAuthCredentials | undefined;
   readonly model?: string | undefined;
   readonly scenarios: ReadonlyArray<ParsedScenario>;
@@ -124,6 +125,9 @@ export const make = Effect.gen(function* () {
         runId: options.runId,
         featurePath: options.featurePath,
         baseUrl: options.baseUrl,
+        ...(options.environmentProfileName !== undefined
+          ? { environmentProfileName: options.environmentProfileName }
+          : {}),
         ...(options.model !== undefined ? { model: options.model } : {}),
         status: "running",
         createdAt,

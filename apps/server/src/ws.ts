@@ -6,9 +6,12 @@
 import {
   type BasicAuthCredentials,
   CopilotUnavailableError,
+  type EnvironmentProfileId,
   WS_METHODS,
   WsRpcGroup,
   type CopilotAuthStatus,
+  type EnvironmentProfileInput,
+  type RunTarget,
 } from "@greenlight/contracts";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -18,6 +21,7 @@ import { RpcSerialization, RpcServer } from "effect/unstable/rpc";
 
 import { BrowserService } from "./browser/BrowserService.ts";
 import { CopilotService } from "./copilot/CopilotService.ts";
+import { EnvironmentProfileService } from "./environment/EnvironmentProfileService.ts";
 import { GherkinService } from "./gherkin/GherkinService.ts";
 import { ProjectService } from "./project/ProjectService.ts";
 import { RunManager } from "./engine/RunManager.ts";
@@ -30,6 +34,7 @@ const makeWsRpcLayer = WsRpcGroup.toLayer(
   Effect.gen(function* () {
     const config = yield* ServerConfig;
     const project = yield* ProjectService;
+    const environmentProfiles = yield* EnvironmentProfileService;
     const gherkin = yield* GherkinService;
     const runManager = yield* RunManager;
     const runStore = yield* RunStore;
@@ -50,6 +55,37 @@ const makeWsRpcLayer = WsRpcGroup.toLayer(
       [WS_METHODS.projectCurrent]: () => project.current,
 
       [WS_METHODS.projectRecent]: () => project.recent,
+
+      [WS_METHODS.environmentProfilesList]: () => environmentProfiles.list,
+
+      [WS_METHODS.environmentProfilesSave]: (payload: EnvironmentProfileInput) =>
+        environmentProfiles.save(payload),
+
+      [WS_METHODS.environmentProfilesDelete]: ({
+        id,
+        deleteLocalCredentials,
+      }: {
+        readonly id: EnvironmentProfileId;
+        readonly deleteLocalCredentials?: boolean | undefined;
+      }) => Effect.as(environmentProfiles.delete(id, deleteLocalCredentials === true), {}),
+
+      [WS_METHODS.environmentProfileCredentialsList]: () =>
+        environmentProfiles.listLocalCredentialStatuses,
+
+      [WS_METHODS.environmentProfileCredentialsSave]: (payload: {
+        readonly authRef: string;
+        readonly credentials: BasicAuthCredentials;
+      }) =>
+        Effect.as(
+          environmentProfiles.saveLocalCredentials(payload.authRef, payload.credentials),
+          {},
+        ),
+
+      [WS_METHODS.environmentProfileCredentialsDelete]: ({
+        authRef,
+      }: {
+        readonly authRef: string;
+      }) => Effect.as(environmentProfiles.deleteLocalCredentials(authRef), {}),
 
       [WS_METHODS.featuresList]: () => project.listFeatures,
 
@@ -81,15 +117,13 @@ const makeWsRpcLayer = WsRpcGroup.toLayer(
 
       [WS_METHODS.runStart]: (payload: {
         readonly featurePath: string;
-        readonly baseUrl: string;
-        readonly httpCredentials?: BasicAuthCredentials | undefined;
+        readonly target: RunTarget;
         readonly pickleIds?: ReadonlyArray<string> | undefined;
         readonly model?: string | undefined;
       }) =>
         runManager.start({
           featurePath: payload.featurePath,
-          baseUrl: payload.baseUrl,
-          httpCredentials: payload.httpCredentials,
+          target: payload.target,
           pickleIds: payload.pickleIds as never,
           model: payload.model,
         }),
