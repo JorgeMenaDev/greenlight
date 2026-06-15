@@ -10,7 +10,13 @@ import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 
-import { RunId, type ParsedFeature, type RunEvent } from "@greenlight/contracts";
+import {
+  RunId,
+  sumUsage,
+  type ParsedFeature,
+  type RunEvent,
+  type Usage,
+} from "@greenlight/contracts";
 
 import { CopilotService } from "./copilot/CopilotService.ts";
 import { GherkinService } from "./gherkin/GherkinService.ts";
@@ -29,6 +35,12 @@ const writeLine = (text: string) =>
   Effect.sync(() => {
     process.stdout.write(`${text}\n`);
   });
+
+const formatTokens = (n: number): string => (n >= 1000 ? `${(n / 1000).toFixed(1)}k` : `${n}`);
+
+const formatUsage = (usage: Usage): string =>
+  `${formatTokens(usage.inputTokens)} in / ${formatTokens(usage.outputTokens)} out · ` +
+  `${usage.premiumRequestCost.toFixed(2)} premium req`;
 
 const makeEventPrinter = (feature: ParsedFeature) => {
   const scenarioName = new Map(
@@ -81,10 +93,12 @@ const makeEventPrinter = (feature: ParsedFeature) => {
             return Effect.void;
         }
       }
-      case "scenario.finished":
-        return writeLine(
-          event.status === "passed" ? color.green("  PASSED\n") : color.red("  FAILED\n"),
-        );
+      case "scenario.finished": {
+        const verdict = event.status === "passed" ? color.green("  PASSED") : color.red("  FAILED");
+        const usageLine =
+          event.usage !== undefined ? color.dim(`  ${formatUsage(event.usage)}`) : "";
+        return writeLine(`${verdict}${usageLine}\n`);
+      }
       case "run.finished":
         return writeLine(
           event.status === "passed"
@@ -156,6 +170,11 @@ export const demoProgram = (options: DemoOptions) =>
       scenarios,
       onEvent: makeEventPrinter(feature!),
     });
+
+    const totalUsage = sumUsage(run.scenarios);
+    if (totalUsage !== undefined) {
+      yield* writeLine(color.dim(`Run usage: ${formatUsage(totalUsage)}`));
+    }
 
     if (run.status !== "passed") {
       process.exitCode = 1;

@@ -18,6 +18,7 @@ import {
   Run,
   RunEvent,
   RunNotFoundError,
+  sumUsage,
   type RunId,
   type RunSummary,
 } from "@greenlight/contracts";
@@ -44,22 +45,27 @@ export class RunStore extends Context.Service<RunStore, RunStoreShape>()(
 const decodeRun = Schema.decodeUnknownEffect(Run);
 const decodeEvent = Schema.decodeUnknownEffect(RunEvent);
 
-const toSummary = (run: Run): RunSummary => ({
-  runId: run.runId,
-  featurePath: run.featurePath,
-  baseUrl: run.baseUrl,
-  ...(run.environmentProfileName !== undefined
-    ? { environmentProfileName: run.environmentProfileName }
-    : {}),
-  status: run.status,
-  createdAt: run.createdAt,
-  ...(run.finishedAt !== undefined ? { finishedAt: run.finishedAt } : {}),
-  scenarioCounts: {
-    passed: run.scenarios.filter((scenario) => scenario.status === "passed").length,
-    failed: run.scenarios.filter((scenario) => scenario.status === "failed").length,
-    skipped: run.scenarios.filter((scenario) => scenario.status === "skipped").length,
-  },
-});
+const toSummary = (run: Run): RunSummary => {
+  const usage = sumUsage(run.scenarios);
+  return {
+    runId: run.runId,
+    featurePath: run.featurePath,
+    baseUrl: run.baseUrl,
+    ...(run.environmentProfileName !== undefined
+      ? { environmentProfileName: run.environmentProfileName }
+      : {}),
+    status: run.status,
+    createdAt: run.createdAt,
+    ...(run.finishedAt !== undefined ? { finishedAt: run.finishedAt } : {}),
+    scenarioCounts: {
+      passed: run.scenarios.filter((scenario) => scenario.status === "passed").length,
+      failed: run.scenarios.filter((scenario) => scenario.status === "failed").length,
+      skipped: run.scenarios.filter((scenario) => scenario.status === "skipped").length,
+    },
+    ...(usage !== undefined ? { usage } : {}),
+    ...(run.model !== undefined ? { model: run.model } : {}),
+  };
+};
 
 export const make = Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient;

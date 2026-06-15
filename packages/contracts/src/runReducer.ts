@@ -61,6 +61,7 @@ export const applyRunEvent = (run: Run | undefined, event: RunEvent): Run | unde
             ...scenario,
             status: event.status,
             finishedAt: event.at,
+            ...(event.usage !== undefined ? { usage: event.usage } : {}),
           }));
     case "run.finished":
       return run === undefined

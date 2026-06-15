@@ -940,6 +940,24 @@ a {
   flex: none;
 }
 
+.usage-summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+
+.usage-premium {
+  padding: 0.05rem 0.35rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text-muted);
+}
+
 .run-scenarios {
   display: flex;
   flex-direction: column;
@@ -1364,6 +1382,23 @@ a {
 
 .count-skipped {
   color: var(--gray);
+}
+
+.history-model {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 0.1rem 0.4rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  flex: none;
+}
+
+.history-duration {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  flex: none;
 }
 
 .history-time {

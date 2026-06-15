@@ -10,7 +10,7 @@
 import * as Schema from "effect/Schema";
 
 import { IsoDateTime, NonNegativeInt, PickleId, RunId } from "./ids.ts";
-import { Run, RunStatus, StepResult, StepStatus } from "./run.ts";
+import { Run, RunStatus, StepResult, StepStatus, Usage } from "./run.ts";
 
 const eventBase = {
   runId: RunId,
@@ -61,6 +61,7 @@ export const ScenarioFinished = Schema.Struct({
   type: Schema.Literal("scenario.finished"),
   pickleId: PickleId,
   status: StepStatus,
+  usage: Schema.optional(Usage),
 });
 
 export const RunFinished = Schema.Struct({
