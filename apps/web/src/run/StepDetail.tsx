@@ -1,8 +1,9 @@
 /**
  * Detail panel for a selected step: verdict, expected vs actual on failure,
- * agent summary and screenshot evidence.
+ * agent summary, screenshot evidence and browser console evidence.
  */
-import type { Run } from "@greenlight/contracts";
+import { useEffect, useMemo, useState } from "react";
+import type { EvidenceRef, Run } from "@greenlight/contracts";
 
 import { formatDuration } from "../lib/format.ts";
 import { evidenceUrl } from "../rpc/client.ts";
@@ -15,16 +16,75 @@ export interface StepDetailProps {
   onClose: () => void;
 }
 
+const EMPTY_EVIDENCE: ReadonlyArray<EvidenceRef> = [];
+
+const ConsoleEvidence = ({ entries }: { entries: ReadonlyArray<EvidenceRef> }) => {
+  const [logsById, setLogsById] = useState<Readonly<Record<string, string>>>({});
+
+  useEffect(() => {
+    let cancelled = false;
+    setLogsById({});
+    void Promise.all(
+      entries.map(async (entry) => {
+        try {
+          const response = await fetch(evidenceUrl(entry.id));
+          if (!response.ok) {
+            return [entry.id, `Failed to load console evidence (${response.status}).`] as const;
+          }
+          return [entry.id, await response.text()] as const;
+        } catch (error) {
+          return [
+            entry.id,
+            `Failed to load console evidence: ${
+              error instanceof Error ? error.message : String(error)
+            }`,
+          ] as const;
+        }
+      }),
+    ).then((logs) => {
+      if (!cancelled) setLogsById(Object.fromEntries(logs));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [entries]);
+
+  return (
+    <section className="detail-section">
+      <h4>Browser console</h4>
+      <div className="console-evidence">
+        {entries.map((entry) => (
+          <div key={entry.id} className="console-evidence-item">
+            <a href={evidenceUrl(entry.id)} target="_blank" rel="noreferrer">
+              {entry.label}
+            </a>
+            <pre className="detail-log">{logsById[entry.id] ?? "Loading console logs..."}</pre>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+};
+
 export const StepDetail = ({ run, selection, onClose }: StepDetailProps) => {
   const scenario = run.scenarios.find((entry) => entry.pickleId === selection.pickleId);
   const step = scenario?.steps.find((entry) => entry.index === selection.stepIndex);
+  const evidence = step?.evidence ?? EMPTY_EVIDENCE;
+  const { screenshots, consoleEvidence, otherEvidence } = useMemo(
+    () => ({
+      screenshots: evidence.filter((entry) => entry.kind === "screenshot"),
+      consoleEvidence: evidence.filter((entry) => entry.kind === "console"),
+      otherEvidence: evidence.filter(
+        (entry) => entry.kind !== "screenshot" && entry.kind !== "console",
+      ),
+    }),
+    [evidence],
+  );
 
   if (scenario === undefined || step === undefined) {
     return null;
   }
 
-  const screenshots = step.evidence.filter((entry) => entry.kind === "screenshot");
-  const otherEvidence = step.evidence.filter((entry) => entry.kind !== "screenshot");
   const duration = formatDuration(step.startedAt, step.finishedAt);
 
   return (
@@ -92,6 +152,8 @@ export const StepDetail = ({ run, selection, onClose }: StepDetailProps) => {
             </div>
           </section>
         )}
+
+        {consoleEvidence.length > 0 && <ConsoleEvidence entries={consoleEvidence} />}
 
         {otherEvidence.length > 0 && (
           <section className="detail-section">

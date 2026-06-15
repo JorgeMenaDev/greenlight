@@ -15,6 +15,7 @@ import {
 } from "@greenlight/client-runtime";
 import type {
   BrowserStatus,
+  BasicAuthCredentials,
   CopilotAuthStatus,
   CopilotModel,
   FeatureFileEntry,
@@ -87,6 +88,7 @@ export interface RpcMethodMap {
     payload: {
       featurePath: string;
       baseUrl: string;
+      httpCredentials?: BasicAuthCredentials;
       pickleIds?: ReadonlyArray<PickleId>;
       model?: string;
     };

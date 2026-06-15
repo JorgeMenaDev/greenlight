@@ -56,6 +56,8 @@ export interface AppState {
 
   models: ReadonlyArray<CopilotModel>;
   targetUrl: string;
+  authUsername: string;
+  authPassword: string;
   /** Selected Copilot model id; "" means the server default. */
   model: string;
 
@@ -71,6 +73,8 @@ export interface AppState {
   deleteFeature: (path: string) => Promise<string | null>;
   loadModels: () => Promise<void>;
   setTargetUrl: (url: string) => void;
+  setAuthUsername: (username: string) => void;
+  setAuthPassword: (password: string) => void;
   setModel: (model: string) => void;
 }
 
@@ -94,6 +98,8 @@ export const useAppStore = create<AppState>()((set, get) => ({
 
   models: [],
   targetUrl: "",
+  authUsername: "",
+  authPassword: "",
   model: "",
 
   bootstrap: async () => {
@@ -113,6 +119,8 @@ export const useAppStore = create<AppState>()((set, get) => ({
         browserStatus,
         project,
         targetUrl: project !== null ? readTargetUrl(project.path) : "",
+        authUsername: "",
+        authPassword: "",
         view: project !== null ? "workspace" : "project",
       });
       if (project !== null) {
@@ -152,6 +160,8 @@ export const useAppStore = create<AppState>()((set, get) => ({
         selectedFeaturePath: undefined,
         parsed: null,
         targetUrl: readTargetUrl(project.path),
+        authUsername: "",
+        authPassword: "",
       });
       void get().loadFeatures();
       void get().loadModels();
@@ -225,6 +235,10 @@ export const useAppStore = create<AppState>()((set, get) => ({
     if (project !== null) writeTargetUrl(project.path, url);
     set({ targetUrl: url });
   },
+
+  setAuthUsername: (username) => set({ authUsername: username }),
+
+  setAuthPassword: (password) => set({ authPassword: password }),
 
   setModel: (model) => set({ model }),
 }));

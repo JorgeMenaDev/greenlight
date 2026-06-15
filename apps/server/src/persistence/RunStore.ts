@@ -34,10 +34,7 @@ export interface RunStoreShape {
   readonly getRun: (runId: RunId) => Effect.Effect<Run, RunNotFoundError>;
   readonly listRuns: (options: ListRunsOptions) => Effect.Effect<ReadonlyArray<RunSummary>>;
   readonly deleteRun: (runId: RunId) => Effect.Effect<void, RunNotFoundError>;
-  readonly eventsAfter: (
-    runId: RunId,
-    afterSeq: number,
-  ) => Effect.Effect<ReadonlyArray<RunEvent>>;
+  readonly eventsAfter: (runId: RunId, afterSeq: number) => Effect.Effect<ReadonlyArray<RunEvent>>;
 }
 
 export class RunStore extends Context.Service<RunStore, RunStoreShape>()(
@@ -96,10 +93,11 @@ export const make = Effect.gen(function* () {
     Effect.gen(function* () {
       const limit = options.limit ?? 50;
       const offset = options.offset ?? 0;
-      const rows = yield* (options.featurePath !== undefined
-        ? sql`SELECT run_json FROM runs WHERE feature_path = ${options.featurePath}
+      const rows = yield* (
+        options.featurePath !== undefined
+          ? sql`SELECT run_json FROM runs WHERE feature_path = ${options.featurePath}
               ORDER BY created_at DESC LIMIT ${limit} OFFSET ${offset}`
-        : sql`SELECT run_json FROM runs ORDER BY created_at DESC LIMIT ${limit} OFFSET ${offset}`
+          : sql`SELECT run_json FROM runs ORDER BY created_at DESC LIMIT ${limit} OFFSET ${offset}`
       ).pipe(Effect.orDie);
       const runs = yield* Effect.forEach(rows, (row) =>
         decodeRun(JSON.parse(String(row["run_json"]))).pipe(Effect.orDie),
@@ -127,7 +125,14 @@ export const make = Effect.gen(function* () {
       );
     });
 
-  return { upsertRun, appendEvent, getRun, listRuns, deleteRun, eventsAfter } satisfies RunStoreShape;
+  return {
+    upsertRun,
+    appendEvent,
+    getRun,
+    listRuns,
+    deleteRun,
+    eventsAfter,
+  } satisfies RunStoreShape;
 });
 
 export const RunStoreLive = Layer.effect(RunStore, make);

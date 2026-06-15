@@ -13,10 +13,10 @@ Prerequisites:
 
 ```sh
 pnpm install
-npx playwright install chromium
+pnpm --filter @greenlight/server exec playwright install chromium
 pnpm typecheck   # should pass before and after your change
-pnpm lint        # oxlint
-pnpm fmt         # prettier --write .
+pnpm lint        # biome lint .
+pnpm fmt         # biome format --write .
 ```
 
 ## Repo layout
@@ -66,9 +66,9 @@ When bumping the beta, update the catalog versions in `pnpm-workspace.yaml` only
 ## Code style & verification
 
 - Strict TypeScript everywhere: each package's tsconfig extends `tsconfig.base.json` (strict, NodeNext, `verbatimModuleSyntax`, `exactOptionalPropertyTypes`). Don't loosen compiler options.
-- Formatting and linting are enforced by Prettier and oxlint — run `pnpm fmt` and `pnpm lint` before opening a PR.
+- Formatting and linting are enforced by Biome — run `pnpm fmt` and `pnpm lint` before opening a PR.
 - **Do not write tests.** This is project policy: the interesting behavior is an LLM agent driving a real browser, which doesn't unit-test meaningfully. Verification is manual — run the headless demo command above (and the affected UI, if you touched one) and confirm the run completes with sensible verdicts. Describe what you ran in your PR.
-- CI runs `pnpm typecheck` (and the placeholder `pnpm test`, which must remain green via `--passWithNoTests`).
+- CI runs `pnpm typecheck`, `pnpm lint`, `pnpm fmt:check`, and the placeholder `pnpm test`, which must remain green via `--passWithNoTests`.
 
 ## Commit conventions
 
