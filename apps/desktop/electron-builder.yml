@@ -18,7 +18,7 @@ extraResources:
   # FileSet (app-builder-lib util/filter.js), so the deploy dir's
   # node_modules are shipped via a second FileSet rooted AT node_modules:
   # with that root, no walked path equals "node_modules" and everything is
-  # copied. The deploy node_modules are a real npm install (no symlinks)
+  # copied. The deploy node_modules come from pnpm's hoisted linker
   # holding the server bundle's externals (better-sqlite3, Copilot CLI,
   # Playwright, effect, ...).
   - from: ../server/deploy

@@ -6,7 +6,7 @@
  *   deploy/
  *     dist/bin.mjs        the tsdown bundle (run `pnpm build` first)
  *     package.json        prod deps only = the bundle's externals
- *     node_modules/       real (non-symlinked) install via `npm install --omit=dev`
+ *     node_modules/       hoisted production install via pnpm
  *
  * Versions are pinned from what is actually installed in the workspace so the
  * deploy install matches what the bundle was built and tested against.
@@ -86,10 +86,13 @@ writeFileSync(
 );
 
 console.log("Installing production dependencies into deploy/ ...");
-execSync("npm install --omit=dev --no-audit --no-fund --loglevel=error", {
-  cwd: deployDir,
-  stdio: "inherit",
-});
+execSync(
+  "pnpm install --prod --ignore-workspace --no-lockfile --config.node-linker=hoisted --config.package-import-method=copy --silent",
+  {
+    cwd: deployDir,
+    stdio: "inherit",
+  },
+);
 
 const mustExist = [
   "dist/bin.mjs",

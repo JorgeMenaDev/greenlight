@@ -66,7 +66,9 @@ export const OnboardingScreen = () => {
 
         <ChecklistItem ok={browserOk} title="Playwright Chromium" okLabel="installed">
           <p>Steps are executed in a managed Chromium browser. Install it once:</p>
-          <pre className="command">npx playwright install chromium</pre>
+          <pre className="command">
+            pnpm --filter @greenlight/server exec playwright install chromium
+          </pre>
           {browserStatus?.detail !== undefined && (
             <p className="setup-detail">{browserStatus.detail}</p>
           )}

@@ -154,7 +154,7 @@ const launchBrowser: Effect.Effect<Browser, BrowserError> = Effect.tryPromise({
   catch: (cause) =>
     new BrowserError({
       message:
-        "Failed to launch a browser. Install one with `npx playwright install chromium` or install Google Chrome.",
+        "Failed to launch a browser. Install one with `pnpm --filter @greenlight/server exec playwright install chromium` or install Google Chrome.",
       cause,
     }),
 });
@@ -210,7 +210,7 @@ export const make = Effect.gen(function* () {
     return {
       state: "missing",
       detail:
-        "No Playwright chromium found. Run `npx playwright install chromium` or install Google Chrome.",
+        "No Playwright chromium found. Run `pnpm --filter @greenlight/server exec playwright install chromium` or install Google Chrome.",
     } satisfies BrowserStatus;
   });
 

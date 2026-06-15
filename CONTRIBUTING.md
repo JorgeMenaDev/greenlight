@@ -13,7 +13,7 @@ Prerequisites:
 
 ```sh
 pnpm install
-npx playwright install chromium
+pnpm --filter @greenlight/server exec playwright install chromium
 pnpm typecheck   # should pass before and after your change
 pnpm lint        # biome lint .
 pnpm fmt         # biome format --write .
