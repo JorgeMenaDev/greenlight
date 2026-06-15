@@ -36,6 +36,20 @@ CLAUDE_SAFE_MODE_MIN_VERSION = (2, 1, 169)
 # @earendil-works/pi-coding-agent 0.79.0 CLI line. Older legacy binaries can
 # ignore unknown flags, so the Pi engine must fail closed below this floor.
 PI_TRUST_ISOLATION_MIN_VERSION = (0, 79, 0)
+DROID_REVIEW_DISABLED_TOOLS = (
+    "create-cli",
+    "dismiss-handoff-items",
+    "edit-cli",
+    "end-feature-run",
+    "execute-cli",
+    "exit-spec-mode",
+    "generate-droid-cli",
+    "propose-mission",
+    "skill",
+    "slack_post_message",
+    "start-mission-run",
+    "todo_write",
+)
 
 
 SCHEMA: dict[str, Any] = {
@@ -711,6 +725,13 @@ def pi_review_isolation_flags() -> list[str]:
     ]
 
 
+def droid_review_disabled_tools(args: argparse.Namespace) -> str:
+    tools = list(DROID_REVIEW_DISABLED_TOOLS)
+    if not args.web_search:
+        tools.extend(["fetch_url", "web_search"])
+    return ",".join(tools)
+
+
 def parse_cli_version(text: str) -> tuple[int, int, int] | None:
     match = re.search(r"\b(\d+)\.(\d+)\.(\d+)\b", text)
     if not match:
@@ -769,6 +790,27 @@ def ensure_pi_isolation_supported(args: argparse.Namespace, repo: Path) -> str:
         detail = ", ".join(missing) if missing else "--help failed"
         raise SystemExit(f"pi engine requires Pi isolation flags missing from --help: {detail}")
     return pi_bin
+
+
+def ensure_droid_isolation_supported(args: argparse.Namespace, repo: Path) -> str:
+    droid_bin = resolve_command(args.droid_bin, repo)
+    with tempfile.TemporaryDirectory(prefix="autoreview-droid-probe.") as tempdir:
+        probe_cwd = Path(tempdir)
+        help_result = run([droid_bin, "exec", "--help"], probe_cwd, check=False)
+    help_text = f"{help_result.stdout}\n{help_result.stderr}"
+    required_markers = [
+        "DEFAULT (no flags)",
+        "Read-only mode",
+        "--disabled-tools",
+        "--cwd",
+        "--output-format",
+        "-f, --file",
+    ]
+    missing = [marker for marker in required_markers if marker not in help_text]
+    if help_result.returncode != 0 or missing:
+        detail = ", ".join(missing) if missing else "exec --help failed"
+        raise SystemExit(f"droid engine requires Droid exec read-only/tool-control help markers missing: {detail}")
+    return droid_bin
 
 
 def format_version(version: tuple[int, int, int]) -> str:
@@ -862,26 +904,36 @@ def run_claude(args: argparse.Namespace, repo: Path, prompt: str) -> str:
 
 
 def run_droid(args: argparse.Namespace, repo: Path, prompt: str) -> str:
-    prompt_path = Path(tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False).name)
-    prompt_path.write_text(prompt)
-    cmd = [
-        resolve_command(args.droid_bin, repo),
-        "exec",
-        "--cwd",
-        str(repo),
-        "--output-format",
-        "stream-json" if args.stream_engine_output else "json",
-        "-f",
-        str(prompt_path),
-    ]
-    if args.model:
-        cmd.extend(["--model", args.model])
-    if args.thinking:
-        cmd.extend(["-r", args.thinking])
-    if not args.tools:
-        cmd.extend(["--disabled-tools", "*"])
-    result = run_with_heartbeat(cmd, repo, label="droid", stream_output=args.stream_engine_output)
-    prompt_path.unlink(missing_ok=True)
+    droid_bin = ensure_droid_isolation_supported(args, repo)
+    with tempfile.TemporaryDirectory(prefix="autoreview-droid.") as tempdir:
+        review_cwd = Path(tempdir)
+        prompt_path = review_cwd / "prompt.txt"
+        prompt_path.write_text(prompt)
+        cmd = [
+            droid_bin,
+            "exec",
+            "--cwd",
+            str(repo),
+            "--output-format",
+            "stream-json" if args.stream_engine_output else "json",
+            "-f",
+            str(prompt_path),
+        ]
+        if args.model:
+            cmd.extend(["--model", args.model])
+        if args.thinking:
+            cmd.extend(["-r", args.thinking])
+        if args.tools:
+            cmd.extend(["--disabled-tools", droid_review_disabled_tools(args)])
+        else:
+            cmd.extend(["--disabled-tools", "*"])
+        result = run_with_heartbeat(
+            cmd,
+            review_cwd,
+            label="droid",
+            stream_output=args.stream_engine_output,
+            resolve_root=repo,
+        )
     if result.returncode != 0:
         raise SystemExit(f"droid engine failed ({result.returncode})\n{result.stderr or result.stdout}")
     return result.stdout
@@ -1383,6 +1435,33 @@ print(json.dumps(report))
 	'''
 
 
+def fake_droid_script() -> str:
+    return r'''#!/usr/bin/env python3
+import json
+import os
+from pathlib import Path
+import sys
+
+args = sys.argv[1:]
+invocations = os.environ.get("AUTOREVIEW_FAKE_DROID_INVOCATIONS")
+if invocations:
+    with open(invocations, "a", encoding="utf-8") as file:
+        file.write(json.dumps({"argv": args, "cwd": os.getcwd()}) + "\n")
+if "exec" in args and ("--help" in args or "-h" in args):
+    print("DEFAULT (no flags)\nRead-only mode\n--disabled-tools\n--cwd\n--output-format\n-f, --file")
+    raise SystemExit(0)
+record = os.environ["AUTOREVIEW_FAKE_RECORD"]
+Path(record).write_text(json.dumps({"argv": args, "cwd": os.getcwd()}))
+report = {
+    "findings": [],
+    "overall_correctness": "patch is correct",
+    "overall_explanation": "fake droid clean",
+    "overall_confidence": 0.99,
+}
+print(json.dumps(report))
+	'''
+
+
 def fake_opencode_script() -> str:
     return r'''#!/usr/bin/env python3
 import json
@@ -1422,13 +1501,16 @@ def self_test_engine_isolation() -> int:
         codex_bin = root / "codex"
         claude_bin = root / "claude"
         pi_bin = root / "pi"
+        droid_bin = root / "droid"
         opencode_bin = root / "opencode"
         record_path = root / "record.json"
         pi_invocations_path = root / "pi-invocations.jsonl"
+        droid_invocations_path = root / "droid-invocations.jsonl"
         hostile_ps_path = root / "hostile-ps-ran"
         write_executable(codex_bin, fake_codex_script())
         write_executable(claude_bin, fake_claude_script())
         write_executable(pi_bin, fake_pi_script())
+        write_executable(droid_bin, fake_droid_script())
         write_executable(opencode_bin, fake_opencode_script())
         write_executable(repo / "ps", f"#!/usr/bin/env python3\nfrom pathlib import Path\nPath({str(hostile_ps_path)!r}).write_text('ran')\n")
 
@@ -1436,6 +1518,7 @@ def self_test_engine_isolation() -> int:
             codex_bin=str(codex_bin),
             claude_bin=str(claude_bin),
             pi_bin=str(pi_bin),
+            droid_bin=str(droid_bin),
             opencode_bin=str(opencode_bin),
             tools=True,
             web_search=True,
@@ -1447,6 +1530,7 @@ def self_test_engine_isolation() -> int:
 
         os.environ["AUTOREVIEW_FAKE_RECORD"] = str(record_path)
         os.environ["AUTOREVIEW_FAKE_PI_INVOCATIONS"] = str(pi_invocations_path)
+        os.environ["AUTOREVIEW_FAKE_DROID_INVOCATIONS"] = str(droid_invocations_path)
         old_path = os.environ.get("PATH", "")
         os.environ["PATH"] = f"{repo}{os.pathsep}{old_path}"
         try:
@@ -1501,6 +1585,27 @@ def self_test_engine_isolation() -> int:
             for entry in pi_invocations[:2]:
                 if Path(entry["cwd"]).resolve() == repo.resolve():
                     raise SystemExit("pi isolation self-test failed: probe ran inside hostile repo")
+
+            run_droid(args, repo, "review hostile patch")
+            droid_record = json.loads(record_path.read_text())
+            droid_argv = droid_record["argv"]
+            disabled_tools = droid_review_disabled_tools(args)
+            for required in ["exec", "--cwd", str(repo), "--disabled-tools", disabled_tools, "--output-format", "json"]:
+                if required not in droid_argv:
+                    raise SystemExit(f"droid isolation self-test failed: missing {required}")
+            if Path(droid_record["cwd"]).resolve() == repo.resolve():
+                raise SystemExit("droid isolation self-test failed: review ran inside hostile repo")
+            if "execute-cli" not in disabled_tools or "edit-cli" not in disabled_tools:
+                raise SystemExit("droid isolation self-test failed: write/shell tools not disabled")
+            droid_invocations = [
+                json.loads(line)
+                for line in droid_invocations_path.read_text().splitlines()
+                if line.strip()
+            ]
+            if [entry["argv"] for entry in droid_invocations[:2]] != [["exec", "--help"], droid_argv]:
+                raise SystemExit("droid isolation self-test failed: unexpected probe/run order")
+            if Path(droid_invocations[0]["cwd"]).resolve() == repo.resolve():
+                raise SystemExit("droid isolation self-test failed: probe ran inside hostile repo")
 
             run_opencode(args, repo, "review hostile patch")
             opencode_record = json.loads(record_path.read_text())
