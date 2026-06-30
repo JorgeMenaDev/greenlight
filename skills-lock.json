@@ -1,6 +1,12 @@
 {
   "version": 1,
   "skills": {
+    "review": {
+      "source": "mattpocock/skills",
+      "sourceType": "github",
+      "skillPath": "skills/in-progress/review/SKILL.md",
+      "computedHash": "a389a3e0f9e791bf90b10a71787ffc80a9bae1f3bcb82a6fdf2b93380e1535f3"
+    },
     "pr-creator": {
       "source": "google-gemini/gemini-cli",
       "sourceType": "github",
