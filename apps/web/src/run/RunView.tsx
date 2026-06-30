@@ -2,16 +2,11 @@
  * Run rendering: scenario list with per-step rows. Used live (fed by the
  * run store) and statically from history (runs.get snapshots).
  */
-import {
-  sumUsage,
-  type Run,
-  type RunStatus,
-  type StepStatus,
-  type Usage,
-} from "@greenlight/contracts";
+import { sumUsage, type Run, type RunStatus, type StepStatus } from "@greenlight/contracts";
 import type { StepActivity, StepSelection } from "../stores/runStore.ts";
 
-import { formatDuration, formatPremium, formatTokens } from "../lib/format.ts";
+import { formatDuration } from "../lib/format.ts";
+import { UsageSummary } from "./UsageSummary.tsx";
 import { activityKey } from "../stores/runStore.ts";
 
 const STEP_ICONS: Record<StepStatus, string> = {
@@ -32,22 +27,6 @@ export const RunStatusBadge = ({ status }: { status: RunStatus }) => (
   <span className={`status-badge status-badge-${status}`}>{status}</span>
 );
 
-/** Tokens + premium request cost for a Scenario or a derived Run total. */
-export const UsageSummary = ({ usage }: { usage: Usage }) => (
-  <span
-    className="usage-summary"
-    title={
-      `${usage.inputTokens} input tokens · ${usage.outputTokens} output tokens · ` +
-      `${usage.premiumRequestCost} premium requests`
-    }
-  >
-    <span className="usage-tokens">
-      {formatTokens(usage.inputTokens)} in / {formatTokens(usage.outputTokens)} out
-    </span>
-    <span className="usage-premium">{formatPremium(usage.premiumRequestCost)} premium</span>
-  </span>
-);
-
 export interface RunViewProps {
   run: Run;
   live: boolean;
@@ -58,6 +37,9 @@ export interface RunViewProps {
 
 export const RunView = ({ run, live, activity, selectedStep, onSelectStep }: RunViewProps) => {
   const totalUsage = sumUsage(run.scenarios);
+  const capturedCount = run.scenarios.filter((scenario) => scenario.usage !== undefined).length;
+  const usagePartial =
+    totalUsage !== undefined && capturedCount > 0 && capturedCount < run.scenarios.length;
   return (
     <div className="run-view">
       <div className="run-view-head">
@@ -68,7 +50,9 @@ export const RunView = ({ run, live, activity, selectedStep, onSelectStep }: Run
           )}
           {run.baseUrl}
         </span>
-        {totalUsage !== undefined && <UsageSummary usage={totalUsage} />}
+        {totalUsage !== undefined && (
+          <UsageSummary usage={totalUsage} partial={usagePartial ? true : undefined} />
+        )}
         <span className="run-view-duration">
           {formatDuration(run.startedAt, live ? undefined : run.finishedAt) ?? ""}
         </span>

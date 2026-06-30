@@ -4,7 +4,10 @@
  *
  *   greenlight-server                 start the server (GREENLIGHT_* env config)
  *   greenlight-server demo <feature> --url <baseUrl> [--model <id>]
- *   greenlight-server benchmark <feature> --url <baseUrl> [--models <a,b,c>] [--out <path>] [--no-cache]
+ *   greenlight-server benchmark <feature> --url <baseUrl> [--models <a,b,c>] [--out <path>] [--no-cache|--refresh]
+ *
+ * Reasoning effort is not pinned: only the model id is passed to Copilot,
+ * so each model runs at its runtime default.
  *
  * @module bin
  */
@@ -53,7 +56,14 @@ if (args[0] === "demo") {
   const modelsArg = flagValue(args, "--models");
   if (featurePath === undefined || baseUrl === undefined) {
     process.stderr.write(
-      "Usage: greenlight-server benchmark <file.feature> --url <baseUrl> [--models <a,b,c>] [--out <path>] [--no-cache]\n",
+      "Usage: greenlight-server benchmark <file.feature> --url <baseUrl>\n" +
+        "       [--models <a,b,c>] [--out <path>] [--no-cache|--refresh]\n" +
+        "\n" +
+        "  --no-cache, --refresh   Re-run every model (ignore per-model disk cache)\n" +
+        "  --models                Comma-separated model ids; omit to use models.default.json\n" +
+        "  --out                   Write benchmark.json here (default: <dataDir>/benchmark/benchmark.json)\n" +
+        "\n" +
+        "Reasoning effort is not pinned — each model runs at its Copilot runtime default.\n",
     );
     process.exit(2);
   }

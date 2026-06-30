@@ -958,6 +958,16 @@ a {
   color: var(--text-muted);
 }
 
+.usage-partial {
+  padding: 0.05rem 0.35rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--amber, #f59e0b);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
 .run-scenarios {
   display: flex;
   flex-direction: column;

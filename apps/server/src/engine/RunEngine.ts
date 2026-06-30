@@ -206,10 +206,10 @@ export const make = Effect.gen(function* () {
 
             const finishScenario = (status: StepStatus, finishedAt: string) =>
               Effect.gen(function* () {
-                const usage = yield* session.readUsage;
-                if (resolvedModel === undefined) {
-                  const sessionModel = yield* session.readModel;
-                  if (sessionModel !== undefined) resolvedModel = sessionModel;
+                const metrics = yield* session.readSessionMetrics;
+                const usage = metrics.usage;
+                if (resolvedModel === undefined && metrics.model !== undefined) {
+                  resolvedModel = metrics.model;
                 }
                 scenarioResults[scenarioIndex] = {
                   ...scenarioResults[scenarioIndex]!,

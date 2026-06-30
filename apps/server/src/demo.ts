@@ -8,39 +8,14 @@
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
-import * as Layer from "effect/Layer";
 
-import {
-  RunId,
-  sumUsage,
-  type ParsedFeature,
-  type RunEvent,
-  type Usage,
-} from "@greenlight/contracts";
+import { RunId, sumUsage, type ParsedFeature, type RunEvent } from "@greenlight/contracts";
 
 import { CopilotService } from "./copilot/CopilotService.ts";
 import { GherkinService } from "./gherkin/GherkinService.ts";
 import { RunEngine } from "./engine/RunEngine.ts";
+import { color, formatUsage, writeLine } from "./lib/cliFormat.ts";
 import { servicesLayer } from "./server.ts";
-
-const color = {
-  green: (text: string) => `[32m${text}[0m`,
-  red: (text: string) => `[31m${text}[0m`,
-  yellow: (text: string) => `[33m${text}[0m`,
-  dim: (text: string) => `[2m${text}[0m`,
-  bold: (text: string) => `[1m${text}[0m`,
-};
-
-const writeLine = (text: string) =>
-  Effect.sync(() => {
-    process.stdout.write(`${text}\n`);
-  });
-
-const formatTokens = (n: number): string => (n >= 1000 ? `${(n / 1000).toFixed(1)}k` : `${n}`);
-
-const formatUsage = (usage: Usage): string =>
-  `${formatTokens(usage.inputTokens)} in / ${formatTokens(usage.outputTokens)} out · ` +
-  `${usage.premiumRequestCost.toFixed(2)} premium req`;
 
 const makeEventPrinter = (feature: ParsedFeature) => {
   const scenarioName = new Map(
@@ -68,27 +43,27 @@ const makeEventPrinter = (feature: ParsedFeature) => {
       case "step.started":
         return writeLine(
           color.dim(
-            `  … ${stepText.get(event.pickleId)?.[event.stepIndex] ?? `step ${event.stepIndex + 1}`}`,
+            `  \u2026 ${stepText.get(event.pickleId)?.[event.stepIndex] ?? `step ${event.stepIndex + 1}`}`,
           ),
         );
       case "agent.activity":
-        return writeLine(color.dim(`      · ${event.tool ?? "agent"}: ${event.summary}`));
+        return writeLine(color.dim(`      \u00b7 ${event.tool ?? "agent"}: ${event.summary}`));
       case "step.finished": {
         const text =
           stepText.get(event.pickleId)?.[event.stepIndex] ?? `step ${event.stepIndex + 1}`;
         switch (event.result.status) {
           case "passed":
-            return writeLine(`  ${color.green("✓")} ${text}`);
+            return writeLine(`  ${color.green("\u2713")} ${text}`);
           case "failed":
             return writeLine(
-              `  ${color.red("✗")} ${text}\n` +
+              `  ${color.red("\u2717")} ${text}\n` +
                 color.red(`      ${event.result.errorMessage ?? "failed"}`) +
                 (event.result.expected !== undefined
                   ? `\n      expected: ${event.result.expected}\n      actual:   ${event.result.actual ?? "?"}`
                   : ""),
             );
           case "skipped":
-            return writeLine(color.dim(`  ○ ${text} (skipped)`));
+            return writeLine(color.dim(`  \u25cb ${text} (skipped)`));
           default:
             return Effect.void;
         }

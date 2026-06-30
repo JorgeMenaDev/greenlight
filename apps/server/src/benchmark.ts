@@ -34,31 +34,8 @@ import { ServerConfig } from "./config.ts";
 import { CopilotService } from "./copilot/CopilotService.ts";
 import { GherkinService } from "./gherkin/GherkinService.ts";
 import { RunEngine } from "./engine/RunEngine.ts";
+import { color, formatDurationMs, formatTokens, writeLine } from "./lib/cliFormat.ts";
 import { servicesLayer } from "./server.ts";
-
-const color = {
-  green: (text: string) => `\x1b[32m${text}\x1b[0m`,
-  red: (text: string) => `\x1b[31m${text}\x1b[0m`,
-  yellow: (text: string) => `\x1b[33m${text}\x1b[0m`,
-  dim: (text: string) => `\x1b[2m${text}\x1b[0m`,
-  bold: (text: string) => `\x1b[1m${text}\x1b[0m`,
-};
-
-const writeLine = (text: string) =>
-  Effect.sync(() => {
-    process.stdout.write(`${text}\n`);
-  });
-
-const formatTokens = (n: number): string => (n >= 1000 ? `${(n / 1000).toFixed(1)}k` : `${n}`);
-
-const formatDuration = (ms: number): string => {
-  if (ms < 1000) return `${ms}ms`;
-  const seconds = ms / 1000;
-  if (seconds < 60) return `${seconds.toFixed(1)}s`;
-  const minutes = Math.floor(seconds / 60);
-  const rest = Math.round(seconds % 60);
-  return `${minutes}m${rest.toString().padStart(2, "0")}s`;
-};
 
 /** Per-model scenario tally; `total` mirrors the dashboard schema. */
 interface ScenarioCounts {
@@ -91,11 +68,11 @@ const renderTable = (rows: ReadonlyArray<ModelResult>): string => {
     const scn =
       `${row.scenarios.passed}\u2713 ${row.scenarios.failed}\u2717` +
       (row.scenarios.skipped > 0 ? ` ${row.scenarios.skipped}\u25cb` : "");
-    const label = row.cached ? `${row.model} ${color.dim("(cached)")}` : row.model;
+    const label = row.cached ? `${row.name} ${color.dim("(cached)")}` : row.name;
     return [
       label,
       row.status,
-      formatDuration(row.durationMs),
+      formatDurationMs(row.durationMs),
       row.usage !== null ? formatTokens(row.usage.inputTokens) : "\u2014",
       row.usage !== null ? formatTokens(row.usage.outputTokens) : "\u2014",
       row.usage !== null ? row.usage.premiumRequestCost.toFixed(2) : "\u2014",
@@ -267,13 +244,13 @@ export const benchmarkProgram = (options: BenchmarkOptions) =>
       if (useCache) {
         const cached = yield* readCachedResult(fs, cacheFile, model);
         if (cached !== undefined) {
-          yield* writeLine(color.bold(`\n\u25b6 ${model} ${color.dim("(cached)")}`));
+          yield* writeLine(color.bold(`\n\u25b6 ${nameFor(model)} ${color.dim("(cached)")}`));
           results.push(cached);
           continue;
         }
       }
 
-      yield* writeLine(color.bold(`\n\u25b6 ${model}`));
+      yield* writeLine(color.bold(`\n\u25b6 ${nameFor(model)} ${color.dim(`(${model})`)}`));
       const startedAt = DateTime.toEpochMillis(yield* DateTime.now);
       const runId = RunId.make(`bench-${index}-${startedAt.toString(36)}`);
       const run = yield* engine.executeRun({

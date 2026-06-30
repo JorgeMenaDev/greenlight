@@ -47,6 +47,10 @@ pnpm dev:desktop
 
 # Headless demo run (the fastest way to exercise the whole engine end to end)
 pnpm --filter @greenlight/server exec node src/bin.ts demo ../../examples/todomvc/todo.feature --url https://demo.playwright.dev/todomvc
+
+# Model benchmark: compare Copilot models on the same feature (writes benchmark.json)
+pnpm --filter @greenlight/server exec node src/bin.ts benchmark ../../examples/todomvc/todo.feature --url https://demo.playwright.dev/todomvc --models gpt-5-mini
+# View results: open apps/server/benchmark/dashboard.html and load the emitted benchmark.json
 ```
 
 ## Effect 4 beta caveats

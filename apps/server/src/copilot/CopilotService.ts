@@ -53,17 +53,14 @@ export interface AgentSession {
     timeoutMs: number,
   ) => Effect.Effect<string | undefined, CopilotError>;
   /**
-   * Read the Copilot consumption accumulated by this session so far.
-   * Resolves to undefined when the runtime reports no metrics (older CLI
-   * or unsupported model) so a Scenario renders "not captured", not zero.
+   * Read usage + resolved model from one SDK metrics call. Usage is
+   * undefined when the runtime reports no meaningful metrics so a Scenario
+   * renders "not captured", not zero.
    */
-  readonly readUsage: Effect.Effect<Usage | undefined>;
-  /**
-   * Read the concrete model id the runtime actually used for this session.
-   * Resolves to undefined when no metrics are reported. Lets a run record
-   * the resolved model even when the caller left the choice to the server.
-   */
-  readonly readModel: Effect.Effect<string | undefined>;
+  readonly readSessionMetrics: Effect.Effect<{
+    readonly usage: Usage | undefined;
+    readonly model: string | undefined;
+  }>;
 }
 
 export interface CopilotServiceShape {
@@ -132,6 +129,24 @@ export const toUsage = (metrics: SessionUsageMetrics): Usage => {
     outputTokens += metric.usage.outputTokens;
   }
   return { inputTokens, outputTokens, premiumRequestCost: metrics.totalPremiumRequestCost };
+};
+
+/**
+ * Map SDK metrics to Usage when the runtime actually reported data.
+ * Empty aggregates resolve to undefined so callers show "not captured".
+ */
+export const usageFromMetrics = (metrics: SessionUsageMetrics): Usage | undefined => {
+  const hasModelMetrics = Object.values(metrics.modelMetrics).some(
+    (metric) => metric !== undefined,
+  );
+  if (!hasModelMetrics && metrics.totalPremiumRequestCost === 0) {
+    return undefined;
+  }
+  const usage = toUsage(metrics);
+  if (usage.inputTokens === 0 && usage.outputTokens === 0 && usage.premiumRequestCost === 0) {
+    return undefined;
+  }
+  return usage;
 };
 
 /** The concrete model id the runtime billed against, if any. */
@@ -231,21 +246,22 @@ export const make = Effect.gen(function* () {
           }
         });
 
-      const readUsage: AgentSession["readUsage"] = Effect.tryPromise(() =>
+      const readSessionMetrics: AgentSession["readSessionMetrics"] = Effect.tryPromise(() =>
         session.rpc.usage.getMetrics(),
       ).pipe(
-        Effect.map((metrics): Usage | undefined => toUsage(metrics)),
-        Effect.catch(() => Effect.succeed<Usage | undefined>(undefined)),
+        Effect.map((metrics) => ({
+          usage: usageFromMetrics(metrics),
+          model: modelFromMetrics(metrics),
+        })),
+        Effect.catch(() =>
+          Effect.succeed({ usage: undefined, model: undefined } satisfies {
+            readonly usage: Usage | undefined;
+            readonly model: string | undefined;
+          }),
+        ),
       );
 
-      const readModel: AgentSession["readModel"] = Effect.tryPromise(() =>
-        session.rpc.usage.getMetrics(),
-      ).pipe(
-        Effect.map((metrics): string | undefined => modelFromMetrics(metrics)),
-        Effect.catch(() => Effect.succeed<string | undefined>(undefined)),
-      );
-
-      return { sendAndWait, readUsage, readModel } satisfies AgentSession;
+      return { sendAndWait, readSessionMetrics } satisfies AgentSession;
     });
 
   return { authStatus, listModels, createSession } satisfies CopilotServiceShape;

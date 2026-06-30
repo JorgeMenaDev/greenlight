@@ -7,7 +7,8 @@ import { useCallback, useEffect, useState } from "react";
 
 import { baseName, formatDuration, relativeTime } from "../lib/format.ts";
 import { errorMessage, rpc } from "../rpc/client.ts";
-import { RunStatusBadge, UsageSummary } from "../run/RunView.tsx";
+import { RunStatusBadge } from "../run/RunView.tsx";
+import { UsageSummary } from "../run/UsageSummary.tsx";
 import { RunDetailView } from "./RunDetailView.tsx";
 
 export const HistoryList = () => {
@@ -120,14 +121,11 @@ export const HistoryList = () => {
                       {entry.model}
                     </span>
                   )}
-                  {(() => {
-                    const duration = formatDuration(entry.createdAt, entry.finishedAt);
-                    return duration !== null ? (
-                      <span className="history-duration" title="Run duration">
-                        {duration}
-                      </span>
-                    ) : null;
-                  })()}
+                  {formatDuration(entry.createdAt, entry.finishedAt) !== null && (
+                    <span className="history-duration" title="Run duration">
+                      {formatDuration(entry.createdAt, entry.finishedAt)}
+                    </span>
+                  )}
                   <span className="history-time">{relativeTime(entry.createdAt)}</span>
                 </button>
                 <button
