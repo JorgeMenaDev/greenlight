@@ -1,0 +1,501 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>GREENLIGHT BENCH — Model Benchmark</title>
+    <style>
+      :root {
+        --bg: #070707;
+        --panel: #0e0f0e;
+        --panel-2: #121412;
+        --line: #1c1f1c;
+        --text: #e7e9e7;
+        --dim: #6b726b;
+        --green: #22c55e;
+        --green-soft: #16894040;
+        --amber: #f59e0b;
+        --red: #ef4444;
+        --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+      }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; height: 100%; }
+      body {
+        background: var(--bg);
+        color: var(--text);
+        font-family: var(--mono);
+        font-size: 13px;
+        line-height: 1.4;
+        background-image:
+          linear-gradient(transparent 0, transparent calc(100% - 1px), #ffffff08 100%),
+          linear-gradient(90deg, transparent 0, transparent calc(100% - 1px), #ffffff08 100%);
+        background-size: 64px 64px;
+      }
+      .wrap { max-width: 1400px; margin: 0 auto; padding: 28px 32px 80px; }
+
+      /* Header */
+      header { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; }
+      .brand { display: flex; gap: 18px; align-items: flex-start; }
+      .eye {
+        width: 54px; height: 54px; border: 2px solid var(--green); border-radius: 50%;
+        display: grid; place-items: center; margin-top: 6px;
+        box-shadow: 0 0 18px #22c55e40, inset 0 0 12px #22c55e20;
+      }
+      .eye::after { content: ""; width: 16px; height: 16px; border-radius: 50%; background: var(--green); box-shadow: 0 0 10px var(--green); }
+      h1 { font-size: 46px; letter-spacing: -1px; margin: 0; font-weight: 800; }
+      h1 .b { color: var(--green); }
+      .subtitle { color: var(--dim); letter-spacing: 3px; font-size: 12px; margin-top: 4px; text-transform: uppercase; }
+      .subtitle .dot { color: var(--green); }
+      .stats { text-align: right; color: var(--dim); letter-spacing: 2px; font-size: 11px; }
+      .stats b { color: var(--text); font-weight: 600; }
+      .stats .row { margin-bottom: 6px; }
+
+      /* Controls */
+      .controls { display: flex; justify-content: space-between; align-items: center; margin: 34px 0 18px; gap: 16px; flex-wrap: wrap; }
+      .tabs { display: flex; gap: 10px; flex-wrap: wrap; }
+      .tab {
+        background: var(--panel); border: 1px solid var(--line); color: var(--dim);
+        padding: 9px 16px; letter-spacing: 2px; font-size: 11px; text-transform: uppercase;
+        cursor: pointer; font-family: var(--mono); border-radius: 3px; transition: all .12s;
+      }
+      .tab:hover { color: var(--text); border-color: #2c302c; }
+      .tab.active { color: var(--green); border-color: var(--green); box-shadow: 0 0 0 1px #22c55e30, 0 0 14px #22c55e25; background: #0c130c; }
+      .filterbtn {
+        background: var(--panel); border: 1px solid var(--line); color: var(--text);
+        padding: 9px 16px; letter-spacing: 2px; font-size: 11px; cursor: pointer;
+        font-family: var(--mono); border-radius: 3px; text-transform: uppercase;
+      }
+      .filterbtn:hover { border-color: var(--green); }
+
+      /* Filter panel */
+      .filter-panel { display: none; gap: 10px 22px; flex-wrap: wrap; padding: 16px 18px; margin-bottom: 18px;
+        background: var(--panel); border: 1px solid var(--line); border-radius: 4px; }
+      .filter-panel.open { display: flex; }
+      .filter-panel label { display: flex; gap: 8px; align-items: center; color: var(--dim); cursor: pointer; font-size: 12px; }
+      .filter-panel input { accent-color: var(--green); }
+      .filter-panel label.on { color: var(--text); }
+
+      /* Panel / chart */
+      .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 30px 32px 24px; }
+      .panel h2 { font-size: 26px; margin: 0 0 6px; font-weight: 800; letter-spacing: -.3px; }
+      .panel .desc { color: var(--dim); letter-spacing: 1.5px; font-size: 11px; text-transform: uppercase; margin-bottom: 26px; }
+      .legend { float: right; display: flex; gap: 18px; align-items: center; margin-top: -52px; }
+      .legend span { display: flex; gap: 7px; align-items: center; color: var(--dim); font-size: 11px; }
+      .legend i { width: 12px; height: 12px; border-radius: 2px; display: inline-block; }
+
+      .chart { position: relative; height: 460px; margin-top: 10px; padding-left: 52px; }
+      .yaxis { position: absolute; left: 0; top: 0; bottom: 40px; width: 52px; }
+      .grid { position: absolute; left: 52px; right: 0; top: 0; bottom: 40px; }
+      .gridline { position: absolute; left: 0; right: 0; border-top: 1px solid #ffffff09; }
+      .gridline span { position: absolute; left: -52px; top: -8px; width: 46px; text-align: right; color: var(--dim); font-size: 10px; }
+      .bars { position: absolute; left: 52px; right: 0; top: 0; bottom: 40px; display: flex; align-items: flex-end; gap: 0; }
+      .col { flex: 1; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; position: relative; }
+      .group { display: flex; gap: 5px; align-items: flex-end; height: 100%; width: 100%; justify-content: center; }
+      .bar { width: 34px; max-width: 40%; position: relative; border-radius: 2px 2px 0 0; transition: height .25s; min-height: 1px; }
+      .bar.green { background: linear-gradient(180deg, #34d77a, #16a34a); box-shadow: 0 0 10px #22c55e30; }
+      .bar.amber { background: linear-gradient(180deg, #fbbf24, #d97706); box-shadow: 0 0 10px #f59e0b30; }
+      .bar.red { background: linear-gradient(180deg, #f87171, #dc2626); box-shadow: 0 0 10px #ef444430; }
+      .bar .val { position: absolute; top: -18px; left: 50%; transform: translateX(-50%); font-size: 10px; color: var(--text); white-space: nowrap; }
+      .stack { width: 34px; max-width: 40%; display: flex; flex-direction: column-reverse; height: 100%; justify-content: flex-start; }
+      .seg { width: 100%; transition: height .25s; }
+      .seg.green { background: linear-gradient(180deg, #34d77a, #16a34a); }
+      .seg.amber { background: linear-gradient(180deg, #fbbf24, #d97706); }
+      .xlabel { position: absolute; bottom: -34px; left: 50%; transform: translateX(-50%) rotate(-18deg); transform-origin: top center;
+        white-space: nowrap; font-size: 10px; color: var(--dim); }
+      .col.errored .xlabel { color: var(--red); }
+
+      /* Table */
+      .tablewrap { margin-top: 40px; overflow-x: auto; }
+      table { width: 100%; border-collapse: collapse; font-size: 12px; }
+      th, td { text-align: right; padding: 9px 14px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+      th { color: var(--dim); letter-spacing: 1.5px; font-size: 10px; text-transform: uppercase; font-weight: 600; }
+      td.model, th.model { text-align: left; color: var(--text); }
+      tr:hover td { background: #ffffff05; }
+      .pill { padding: 2px 8px; border-radius: 3px; font-size: 10px; letter-spacing: 1px; text-transform: uppercase; }
+      .pill.passed { color: var(--green); background: #16a34a20; }
+      .pill.failed, .pill.error { color: var(--red); background: #dc262620; }
+      .badge { color: var(--dim); border: 1px solid var(--line); border-radius: 3px; padding: 1px 6px; font-size: 9px; letter-spacing: 1px; margin-left: 8px; }
+      .best { color: var(--green); }
+      .muted { color: var(--dim); }
+
+      .toolbar { display: flex; gap: 12px; align-items: center; margin-top: 14px; }
+      .loadbtn { background: var(--green); color: #04140a; border: none; padding: 8px 14px; border-radius: 4px; cursor: pointer; font-family: var(--mono); font-weight: 700; letter-spacing: 1px; font-size: 11px; }
+      .source { color: var(--dim); font-size: 11px; letter-spacing: 1px; }
+      .source.sample { color: var(--amber); }
+      input[type="file"] { display: none; }
+      footer { color: var(--dim); font-size: 10px; letter-spacing: 1.5px; margin-top: 36px; text-transform: uppercase; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header>
+        <div class="brand">
+          <div class="eye"></div>
+          <div>
+            <h1>GREENLIGHT<span class="b">BENCH</span></h1>
+            <div class="subtitle"><span class="dot">●</span> Model Benchmark / Speed + Token Analysis</div>
+          </div>
+        </div>
+        <div class="stats" id="stats"></div>
+      </header>
+
+      <div class="controls">
+        <div class="tabs" id="tabs"></div>
+        <button type="button" class="filterbtn" id="filterToggle">Filter Models [0/0]</button>
+      </div>
+
+      <div class="filter-panel" id="filterPanel"></div>
+
+      <div class="panel">
+        <h2 id="chartTitle">Benchmark</h2>
+        <div class="desc" id="chartDesc"></div>
+        <div class="legend" id="legend"></div>
+        <div class="chart">
+          <div class="grid" id="grid"></div>
+          <div class="bars" id="bars"></div>
+        </div>
+
+        <div class="tablewrap">
+          <table>
+            <thead>
+              <tr>
+                <th class="model">Model</th>
+                <th>Status</th>
+                <th>Time</th>
+                <th>Input</th>
+                <th>Output</th>
+                <th>Total tok</th>
+                <th>Premium</th>
+                <th>Scn</th>
+              </tr>
+            </thead>
+            <tbody id="tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="toolbar">
+        <button type="button" class="loadbtn" id="loadBtn">Load benchmark.json</button>
+        <input type="file" id="fileInput" accept="application/json,.json" />
+        <span class="source" id="source"></span>
+      </div>
+
+      <footer id="meta"></footer>
+    </div>
+
+    <script>
+      // ---- Sample data (illustrative; replace by loading a real benchmark.json) ----
+      const SAMPLE = {
+        feature: "e2e/Smoke \u2013 Landing page.feature",
+        baseUrl: "https://www.saucedemo.com",
+        generatedAt: new Date().toISOString(),
+        sample: true,
+        models: [
+          m("claude-opus-4.8", "Claude Opus 4.8", "passed", 35100, 17200, 1080, 0.38),
+          m("claude-opus-4.7", "Claude Opus 4.7", "passed", 36500, 17500, 1100, 0.36),
+          m("claude-opus-4.6", "Claude Opus 4.6", "passed", 38900, 17900, 1150, 0.34),
+          m("claude-opus-4.5", "Claude Opus 4.5", "passed", 41200, 18432, 1204, 0.33),
+          m("claude-sonnet-4.6", "Claude Sonnet 4.6", "passed", 21100, 15800, 940, 0.1),
+          m("claude-sonnet-4.5", "Claude Sonnet 4.5", "passed", 22400, 16100, 980, 0.1),
+          m("claude-haiku-4.5", "Claude Haiku 4.5", "passed", 12800, 14200, 760, 0.03),
+          m("gpt-5.5", "GPT-5.5", "passed", 28700, 16900, 1320, 0.25),
+          m("gpt-5.4", "GPT-5.4", "passed", 26500, 16400, 1280, 0.2),
+          m("gpt-5.3-codex", "GPT-5.3-Codex", "failed", 31200, 17100, 1400, 0.22, 0, 1),
+          m("gpt-5.4-mini", "GPT-5.4 mini", "passed", 14300, 13900, 820, 0.04),
+          m("gpt-5-mini", "GPT-5 mini", "passed", 13100, 13500, 780, 0.03),
+          m("gemini-3.5-flash", "Gemini 3.5 Flash", "passed", 9800, 12800, 640, 0.02),
+        ],
+      };
+      function m(id, name, status, durationMs, inTok, outTok, premium, passed, failed) {
+        const p = passed === undefined ? (status === "passed" ? 1 : 0) : passed;
+        const f = failed === undefined ? (status === "passed" ? 0 : 1) : failed;
+        return {
+          model: id,
+          name,
+          status,
+          durationMs,
+          cached: false,
+          scenarios: { passed: p, failed: f, skipped: 0, total: p + f },
+          usage: status === "passed" || inTok ? { inputTokens: inTok, outputTokens: outTok, premiumRequestCost: premium } : null,
+        };
+      }
+
+      // ---- Formatters ----
+      const fmtTok = (n) => (n == null ? "\u2014" : n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n));
+      const fmtDur = (ms) => {
+        if (ms == null) return "\u2014";
+        if (ms < 1000) return `${ms}ms`;
+        const s = ms / 1000;
+        if (s < 60) return `${s.toFixed(1)}s`;
+        const mn = Math.floor(s / 60), r = Math.round(s % 60);
+        return `${mn}m${String(r).padStart(2, "0")}s`;
+      };
+      const fmtPrem = (n) => (n == null ? "\u2014" : n.toFixed(2));
+
+      // ---- Metric definitions ----
+      const METRICS = {
+        tokens: {
+          tab: "Tokens", title: "Token usage by model", unit: "tokens",
+          desc: "Input (green) + output (amber) tokens \u00b7 stacked total per model",
+          stacked: true, legend: [["green", "Input"], ["amber", "Output"]],
+          value: (d) => (d.usage ? d.usage.inputTokens + d.usage.outputTokens : 0),
+          parts: (d) => (d.usage ? [["green", d.usage.inputTokens], ["amber", d.usage.outputTokens]] : []),
+          fmt: fmtTok, lowerBetter: true,
+        },
+        speed: {
+          tab: "Speed", title: "Wall-clock duration by model", unit: "time",
+          desc: "Total run time per model \u00b7 lower is faster",
+          legend: [["green", "Duration"]],
+          value: (d) => d.durationMs || 0, fmt: fmtDur, lowerBetter: true, color: "green",
+        },
+        premium: {
+          tab: "Premium", title: "Premium request cost by model", unit: "premium req",
+          desc: "Multiplier-adjusted premium request cost per model \u00b7 lower is cheaper",
+          legend: [["amber", "Premium req"]],
+          value: (d) => (d.usage ? d.usage.premiumRequestCost : 0), fmt: fmtPrem, lowerBetter: true, color: "amber",
+        },
+        pass: {
+          tab: "Pass rate", title: "Scenario pass rate by model", unit: "%",
+          desc: "Percentage of scenarios that passed per model \u00b7 higher is better",
+          legend: [["green", "Pass %"]],
+          value: (d) => (d.scenarios?.total ? (d.scenarios.passed / d.scenarios.total) * 100 : 0),
+          fmt: (v) => `${Math.round(v)}%`, lowerBetter: false, color: "green", maxOverride: 100,
+        },
+      };
+
+      let DATA = window.__BENCHMARK__ || SAMPLE;
+      const state = { metric: "tokens", hidden: new Set() };
+
+      // ---- Render ----
+      function visibleModels() {
+        return DATA.models.filter((d) => !state.hidden.has(d.model));
+      }
+      function niceMax(max, override) {
+        if (override) return override;
+        if (max <= 0) return 1;
+        const pow = 10 ** Math.floor(Math.log10(max));
+        const n = Math.ceil(max / pow) * pow;
+        return n === max ? n * 1.1 : n;
+      }
+
+      function renderStats() {
+        const models = DATA.models;
+        const totalScn = models.reduce((a, d) => a + (d.scenarios ? d.scenarios.total : 0), 0);
+        const totalPrem = models.reduce((a, d) => a + (d.usage ? d.usage.premiumRequestCost : 0), 0);
+        document.getElementById("stats").innerHTML =
+          `<div class="row">SYSTEM: <b>MONITORING</b> &nbsp; MODELS: <b>${models.length}</b></div>` +
+          `<div class="row">TOTAL SCENARIOS: <b>${totalScn}</b></div>` +
+          `<div class="row">TOTAL PREMIUM: <b>${totalPrem.toFixed(2)}</b></div>`;
+      }
+
+      function renderTabs() {
+        const el = document.getElementById("tabs");
+        el.innerHTML = Object.keys(METRICS)
+          .map((k) => `<button class="tab ${k === state.metric ? "active" : ""}" data-k="${k}">${METRICS[k].tab}</button>`)
+          .join("");
+        el.querySelectorAll(".tab").forEach((b) => {
+          b.addEventListener("click", () => {
+            state.metric = b.dataset.k;
+            render();
+          });
+        });
+      }
+
+      function renderFilter() {
+        const total = DATA.models.length;
+        const shown = total - state.hidden.size;
+        document.getElementById("filterToggle").textContent = `Filter Models [${shown}/${total}]`;
+        const panel = document.getElementById("filterPanel");
+        panel.innerHTML = DATA.models
+          .map((d) => {
+            const on = !state.hidden.has(d.model);
+            return `<label class="${on ? "on" : ""}"><input type="checkbox" data-m="${d.model}" ${on ? "checked" : ""}/> ${d.name || d.model}</label>`;
+          })
+          .join("");
+        panel.querySelectorAll("input").forEach((c) => {
+          c.addEventListener("change", () => {
+            if (c.checked) state.hidden.delete(c.dataset.m);
+            else state.hidden.add(c.dataset.m);
+            render();
+          });
+        });
+      }
+
+      function renderChart() {
+        const mdef = METRICS[state.metric];
+        document.getElementById("chartTitle").textContent = mdef.title;
+        document.getElementById("chartDesc").textContent = mdef.desc;
+        document.getElementById("legend").innerHTML = mdef.legend
+          .map(([c, label]) => `<span><i style="background:${c === "green" ? "#22c55e" : c === "amber" ? "#f59e0b" : "#ef4444"}"></i>${label}</span>`)
+          .join("");
+
+        const models = visibleModels();
+        const values = models.map((d) => mdef.value(d));
+        const dataMax = Math.max(0, ...values);
+        const max = niceMax(dataMax, mdef.maxOverride);
+
+        // best (winner) index
+        let bestIdx = -1, bestVal = mdef.lowerBetter ? Infinity : -Infinity;
+        models.forEach((d, i) => {
+          if (d.status !== "passed") return;
+          const v = mdef.value(d);
+          if (mdef.lowerBetter ? v < bestVal && v > 0 : v > bestVal) { bestVal = v; bestIdx = i; }
+        });
+
+        // gridlines
+        const grid = document.getElementById("grid");
+        grid.innerHTML = "";
+        for (let i = 0; i <= 4; i++) {
+          const frac = i / 4;
+          const line = document.createElement("div");
+          line.className = "gridline";
+          line.style.bottom = `${frac * 100}%`;
+          const v = max * frac;
+          line.innerHTML = `<span>${mdef.unit === "%" ? Math.round(v) : mdef.fmt(v)}</span>`;
+          grid.appendChild(line);
+        }
+
+        // bars
+        const bars = document.getElementById("bars");
+        bars.innerHTML = "";
+        models.forEach((d, i) => {
+          const col = document.createElement("div");
+          col.className = `col${d.status !== "passed" ? " errored" : ""}`;
+          const total = mdef.value(d);
+          const heightPct = max > 0 ? (total / max) * 100 : 0;
+
+          if (mdef.stacked) {
+            const parts = mdef.parts(d);
+            const stack = document.createElement("div");
+            stack.className = "stack";
+            stack.style.height = `${heightPct}%`;
+            parts.forEach(([c, v]) => {
+              const seg = document.createElement("div");
+              seg.className = `seg ${c}`;
+              seg.style.height = total > 0 ? `${(v / total) * 100}%` : "0%";
+              stack.appendChild(seg);
+            });
+            const val = document.createElement("div");
+            val.className = "val";
+            val.textContent = total > 0 ? mdef.fmt(total) : "\u2014";
+            stack.appendChild(val);
+            const group = document.createElement("div");
+            group.className = "group";
+            group.appendChild(stack);
+            col.appendChild(group);
+          } else {
+            const group = document.createElement("div");
+            group.className = "group";
+            const bar = document.createElement("div");
+            const color = d.status !== "passed" && state.metric === "pass" ? "red" : mdef.color;
+            bar.className = `bar ${color}`;
+            bar.style.height = `${heightPct}%`;
+            const val = document.createElement("div");
+            val.className = "val";
+            val.textContent = total > 0 ? mdef.fmt(total) : "\u2014";
+            bar.appendChild(val);
+            group.appendChild(bar);
+            col.appendChild(group);
+          }
+
+          const label = document.createElement("div");
+          label.className = "xlabel";
+          label.innerHTML = (i === bestIdx ? "\u2605 " : "") + (d.name || d.model);
+          if (i === bestIdx) label.style.color = "#22c55e";
+          col.appendChild(label);
+          bars.appendChild(col);
+        });
+      }
+
+      function renderTable() {
+        const mdef = METRICS[state.metric];
+        const models = visibleModels();
+        // winners per column
+        const min = (sel) => Math.min(...models.filter((d) => d.status === "passed").map(sel).filter((v) => v > 0));
+        const fastest = min((d) => d.durationMs || Infinity);
+        const cheapest = min((d) => (d.usage ? d.usage.premiumRequestCost : Infinity));
+
+        document.getElementById("tbody").innerHTML = models
+          .map((d) => {
+            const u = d.usage;
+            const totalTok = u ? u.inputTokens + u.outputTokens : null;
+            const scn = d.scenarios || { passed: 0, failed: 0, skipped: 0 };
+            const cached = d.cached ? `<span class="badge">cached</span>` : "";
+            const timeCls = d.status === "passed" && d.durationMs === fastest ? "best" : "";
+            const premCls = u && u.premiumRequestCost === cheapest ? "best" : "";
+            return (
+              `<tr>` +
+              `<td class="model">${d.name || d.model}${cached}</td>` +
+              `<td><span class="pill ${d.status}">${d.status}</span></td>` +
+              `<td class="${timeCls}">${fmtDur(d.durationMs)}</td>` +
+              `<td>${fmtTok(u ? u.inputTokens : null)}</td>` +
+              `<td>${fmtTok(u ? u.outputTokens : null)}</td>` +
+              `<td>${fmtTok(totalTok)}</td>` +
+              `<td class="${premCls}">${fmtPrem(u ? u.premiumRequestCost : null)}</td>` +
+              `<td>${scn.passed}\u2713 ${scn.failed}\u2717${scn.skipped ? ` ${scn.skipped}\u25cb` : ""}</td>` +
+              `</tr>`
+            );
+          })
+          .join("");
+      }
+
+      function renderMeta() {
+        const src = document.getElementById("source");
+        if (DATA.sample) { src.textContent = "showing sample data \u2014 load a benchmark.json to see real results"; src.className = "source sample"; }
+        else { src.textContent = `loaded \u00b7 ${DATA.models.length} model(s)`; src.className = "source"; }
+        document.getElementById("meta").textContent =
+          `FEATURE: ${DATA.feature || "?"}  \u00b7  TARGET: ${DATA.baseUrl || "?"}  \u00b7  GENERATED: ${DATA.generatedAt || "?"}`;
+      }
+
+      function render() {
+        renderStats();
+        renderTabs();
+        renderFilter();
+        renderChart();
+        renderTable();
+        renderMeta();
+      }
+
+      // ---- Interactions ----
+      document.getElementById("filterToggle").addEventListener("click", () =>
+        document.getElementById("filterPanel").classList.toggle("open"),
+      );
+      document.getElementById("loadBtn").addEventListener("click", () =>
+        document.getElementById("fileInput").click(),
+      );
+      document.getElementById("fileInput").addEventListener("change", (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = () => {
+          try {
+            const json = JSON.parse(reader.result);
+            DATA = normalize(json);
+            state.hidden.clear();
+            render();
+          } catch (err) {
+            alert(`Could not parse benchmark.json: ${err.message}`);
+          }
+        };
+        reader.readAsText(file);
+      });
+
+      // Accept either { models: [...] } or a raw array of model results.
+      function normalize(json) {
+        const models = Array.isArray(json) ? json : json.models || [];
+        return {
+          feature: json.feature, baseUrl: json.baseUrl, generatedAt: json.generatedAt,
+          sample: false,
+          models: models.map((d) => ({
+            model: d.model, name: d.name || d.model, status: d.status || "passed",
+            durationMs: d.durationMs ?? null, cached: !!d.cached,
+            scenarios: d.scenarios || { passed: 0, failed: 0, skipped: 0, total: 0 },
+            usage: d.usage || null,
+          })),
+        };
+      }
+
+      render();
+    </script>
+  </body>
+</html>

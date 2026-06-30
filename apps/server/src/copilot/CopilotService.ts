@@ -12,7 +12,7 @@ import * as NodeFs from "node:fs";
 import * as NodeModule from "node:module";
 import * as NodePath from "node:path";
 
-import { approveAll, CopilotClient } from "@github/copilot-sdk";
+import { approveAll, CopilotClient, type CopilotSession } from "@github/copilot-sdk";
 
 import * as Context from "effect/Context";
 import * as Data from "effect/Data";
@@ -21,6 +21,8 @@ import * as Layer from "effect/Layer";
 import * as Ref from "effect/Ref";
 import * as Scope from "effect/Scope";
 import * as Semaphore from "effect/Semaphore";
+
+import type { Usage } from "@greenlight/contracts";
 
 import type { AgentTool } from "../engine/AgentTool.ts";
 
@@ -50,6 +52,15 @@ export interface AgentSession {
     prompt: string,
     timeoutMs: number,
   ) => Effect.Effect<string | undefined, CopilotError>;
+  /**
+   * Read usage + resolved model from one SDK metrics call. Usage is
+   * undefined when the runtime reports no meaningful metrics so a Scenario
+   * renders "not captured", not zero.
+   */
+  readonly readSessionMetrics: Effect.Effect<{
+    readonly usage: Usage | undefined;
+    readonly model: string | undefined;
+  }>;
 }
 
 export interface CopilotServiceShape {
@@ -100,6 +111,47 @@ const copilotTry = <A>(message: string, run: () => Promise<A>): Effect.Effect<A,
         cause,
       }),
   });
+
+type SessionUsageMetrics = Awaited<ReturnType<CopilotSession["rpc"]["usage"]["getMetrics"]>>;
+
+/**
+ * Map the SDK's session usage aggregate to our `Usage`. Token totals are
+ * summed across per-model metrics (a Scenario normally uses one model);
+ * `premiumRequestCost` is the runtime's authoritative premium request
+ * count, which correctly bills per user-initiated request (see ADR 0002).
+ */
+export const toUsage = (metrics: SessionUsageMetrics): Usage => {
+  let inputTokens = 0;
+  let outputTokens = 0;
+  for (const metric of Object.values(metrics.modelMetrics)) {
+    if (metric === undefined) continue;
+    inputTokens += metric.usage.inputTokens;
+    outputTokens += metric.usage.outputTokens;
+  }
+  return { inputTokens, outputTokens, premiumRequestCost: metrics.totalPremiumRequestCost };
+};
+
+/**
+ * Map SDK metrics to Usage when the runtime actually reported data.
+ * Empty aggregates resolve to undefined so callers show "not captured".
+ */
+export const usageFromMetrics = (metrics: SessionUsageMetrics): Usage | undefined => {
+  const hasModelMetrics = Object.values(metrics.modelMetrics).some(
+    (metric) => metric !== undefined,
+  );
+  if (!hasModelMetrics && metrics.totalPremiumRequestCost === 0) {
+    return undefined;
+  }
+  const usage = toUsage(metrics);
+  if (usage.inputTokens === 0 && usage.outputTokens === 0 && usage.premiumRequestCost === 0) {
+    return undefined;
+  }
+  return usage;
+};
+
+/** The concrete model id the runtime billed against, if any. */
+export const modelFromMetrics = (metrics: SessionUsageMetrics): string | undefined =>
+  Object.keys(metrics.modelMetrics)[0];
 
 export const make = Effect.gen(function* () {
   const layerScope = yield* Effect.service(Scope.Scope);
@@ -194,7 +246,22 @@ export const make = Effect.gen(function* () {
           }
         });
 
-      return { sendAndWait } satisfies AgentSession;
+      const readSessionMetrics: AgentSession["readSessionMetrics"] = Effect.tryPromise(() =>
+        session.rpc.usage.getMetrics(),
+      ).pipe(
+        Effect.map((metrics) => ({
+          usage: usageFromMetrics(metrics),
+          model: modelFromMetrics(metrics),
+        })),
+        Effect.catch(() =>
+          Effect.succeed({ usage: undefined, model: undefined } satisfies {
+            readonly usage: Usage | undefined;
+            readonly model: string | undefined;
+          }),
+        ),
+      );
+
+      return { sendAndWait, readSessionMetrics } satisfies AgentSession;
     });
 
   return { authStatus, listModels, createSession } satisfies CopilotServiceShape;

@@ -138,6 +138,7 @@ export const make = Effect.gen(function* () {
       yield* emit({ type: "run.started", run: initialRun });
 
       let runError: string | undefined;
+      let resolvedModel: string | undefined = options.model;
 
       const runScenario = (scenario: ParsedScenario, scenarioIndex: number) =>
         Effect.scoped(
@@ -205,14 +206,25 @@ export const make = Effect.gen(function* () {
 
             const finishScenario = (status: StepStatus, finishedAt: string) =>
               Effect.gen(function* () {
+                const metrics = yield* session.readSessionMetrics;
+                const usage = metrics.usage;
+                if (resolvedModel === undefined && metrics.model !== undefined) {
+                  resolvedModel = metrics.model;
+                }
                 scenarioResults[scenarioIndex] = {
                   ...scenarioResults[scenarioIndex]!,
                   status,
                   startedAt,
                   finishedAt,
                   steps,
+                  ...(usage !== undefined ? { usage } : {}),
                 };
-                yield* emit({ type: "scenario.finished", pickleId: scenario.pickleId, status });
+                yield* emit({
+                  type: "scenario.finished",
+                  pickleId: scenario.pickleId,
+                  status,
+                  ...(usage !== undefined ? { usage } : {}),
+                });
               });
 
             for (let stepIndex = 0; stepIndex < scenario.steps.length; stepIndex++) {
@@ -331,6 +343,7 @@ export const make = Effect.gen(function* () {
         ...initialRun,
         status: finalStatus,
         finishedAt,
+        ...(resolvedModel !== undefined ? { model: resolvedModel } : {}),
         ...(runError !== undefined ? { error: runError } : {}),
         scenarios: scenarioResults,
       } satisfies Run;

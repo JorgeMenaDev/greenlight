@@ -47,3 +47,10 @@ export const baseName = (path: string): string => {
   const parts = path.replace(/[\\/]+$/, "").split(/[\\/]/);
   return parts[parts.length - 1] ?? path;
 };
+
+/** Compact token count, e.g. "812", "12.3k". */
+export const formatTokens = (n: number): string =>
+  n >= 1000 ? `${(n / 1000).toFixed(1)}k` : `${n}`;
+
+/** Premium request cost, fractional, e.g. "0.33". */
+export const formatPremium = (n: number): string => n.toFixed(2);

@@ -1,0 +1,43 @@
+{
+  "feature": "e2e/Smoke \u2013 Landing page.feature",
+  "baseUrl": "https://www.saucedemo.com",
+  "generatedAt": "2026-06-15T14:40:00.000Z",
+  "models": [
+    {
+      "model": "claude-opus-4.5",
+      "name": "Claude Opus 4.5",
+      "status": "passed",
+      "durationMs": 41200,
+      "cached": false,
+      "scenarios": { "passed": 1, "failed": 0, "skipped": 0, "total": 1 },
+      "usage": { "inputTokens": 18432, "outputTokens": 1204, "premiumRequestCost": 0.33 }
+    },
+    {
+      "model": "gpt-5.5",
+      "name": "GPT-5.5",
+      "status": "passed",
+      "durationMs": 28700,
+      "cached": true,
+      "scenarios": { "passed": 1, "failed": 0, "skipped": 0, "total": 1 },
+      "usage": { "inputTokens": 16900, "outputTokens": 1320, "premiumRequestCost": 0.25 }
+    },
+    {
+      "model": "gemini-3.5-flash",
+      "name": "Gemini 3.5 Flash",
+      "status": "passed",
+      "durationMs": 9800,
+      "cached": false,
+      "scenarios": { "passed": 1, "failed": 0, "skipped": 0, "total": 1 },
+      "usage": { "inputTokens": 12800, "outputTokens": 640, "premiumRequestCost": 0.02 }
+    },
+    {
+      "model": "gpt-5.3-codex",
+      "name": "GPT-5.3-Codex",
+      "status": "failed",
+      "durationMs": 31200,
+      "cached": false,
+      "scenarios": { "passed": 0, "failed": 1, "skipped": 0, "total": 1 },
+      "usage": { "inputTokens": 17100, "outputTokens": 1400, "premiumRequestCost": 0.22 }
+    }
+  ]
+}

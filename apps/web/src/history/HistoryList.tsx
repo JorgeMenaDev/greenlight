@@ -5,9 +5,10 @@
 import type { RunId, RunSummary } from "@greenlight/contracts";
 import { useCallback, useEffect, useState } from "react";
 
-import { baseName, relativeTime } from "../lib/format.ts";
+import { baseName, formatDuration, relativeTime } from "../lib/format.ts";
 import { errorMessage, rpc } from "../rpc/client.ts";
 import { RunStatusBadge } from "../run/RunView.tsx";
+import { UsageSummary } from "../run/UsageSummary.tsx";
 import { RunDetailView } from "./RunDetailView.tsx";
 
 export const HistoryList = () => {
@@ -114,6 +115,17 @@ export const HistoryList = () => {
                       <span className="count count-skipped">{counts.skipped} skipped</span>
                     )}
                   </span>
+                  {entry.usage !== undefined && <UsageSummary usage={entry.usage} />}
+                  {entry.model !== undefined && (
+                    <span className="history-model" title={`Model: ${entry.model}`}>
+                      {entry.model}
+                    </span>
+                  )}
+                  {formatDuration(entry.createdAt, entry.finishedAt) !== null && (
+                    <span className="history-duration" title="Run duration">
+                      {formatDuration(entry.createdAt, entry.finishedAt)}
+                    </span>
+                  )}
                   <span className="history-time">{relativeTime(entry.createdAt)}</span>
                 </button>
                 <button

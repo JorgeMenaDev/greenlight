@@ -50,6 +50,22 @@ pnpm --filter @greenlight/server exec node src/bin.ts demo ../../examples/todomv
 
 You'll see each step interpreted live, with per-step and per-scenario verdicts at the end. Add `--model <id>` to pick a specific Copilot model. (The command runs inside `apps/server`, hence the `../../` in the feature path — equivalently, run `node apps/server/src/bin.ts demo examples/todomvc/todo.feature --url …` from the repo root.)
 
+### Model benchmark (compare Copilot models)
+
+Run the same feature across several Copilot models and compare wall-clock time plus token/premium cost:
+
+```sh
+node apps/server/src/bin.ts benchmark examples/todomvc/todo.feature \
+  --url https://demo.playwright.dev/todomvc \
+  --models gpt-5-mini,gemini-3.5-flash
+```
+
+Results print as a comparison table and are written to `<dataDir>/benchmark/benchmark.json` (override with `--out`). Re-running with an extra model reuses cached results for models already benchmarked; pass `--no-cache` or `--refresh` to force a full re-run. Omit `--models` to use the default template in `apps/server/benchmark/models.default.json`.
+
+Open `apps/server/benchmark/dashboard.html` in a browser and **Load benchmark.json** to chart the report. Reasoning effort is not pinned — each model runs at its Copilot runtime default.
+
+Per-scenario token usage is also shown in the web UI run view and run history after a live run completes.
+
 ### Engine server + browser UI
 
 ```sh
@@ -92,6 +108,8 @@ Early but functional. Working today:
 - SQLite persistence of runs, steps, and evidence
 - Live run event streaming over WS RPC, with replay for late subscribers
 - Headless `demo` CLI command
+- Per-scenario Copilot token usage in runs and history
+- `benchmark` CLI + JSON report for comparing models on the same feature
 
 Toward v1:
 
