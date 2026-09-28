@@ -13,6 +13,7 @@ import * as Layer from "effect/Layer";
 import * as Path from "effect/Path";
 import * as SqlClient from "effect/unstable/sql/SqlClient";
 
+import { encryptPassword } from "../environment/credentialEncryption.ts";
 import { ServerConfig } from "../config.ts";
 import * as SqliteClient from "./NodeSqliteClient.ts";
 
@@ -20,6 +21,7 @@ const setup = Layer.effectDiscard(
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient;
     yield* sql`PRAGMA foreign_keys = ON;`;
+    yield* sql`PRAGMA secure_delete = ON;`;
 
     yield* sql`
       CREATE TABLE IF NOT EXISTS runs (
@@ -85,6 +87,36 @@ const setup = Layer.effectDiscard(
         PRIMARY KEY (project_path, auth_ref)
       )
     `;
+    const columns = yield* sql`PRAGMA table_info(environment_profile_credentials)`;
+    if (!columns.some((column) => column.name === "credential_format")) {
+      yield* sql`ALTER TABLE environment_profile_credentials ADD COLUMN credential_format INTEGER NOT NULL DEFAULT 0`;
+    }
+    const legacy =
+      yield* sql`SELECT project_path, auth_ref, password FROM environment_profile_credentials WHERE credential_format = 0`;
+    if (legacy.length > 0) {
+      // Encrypt every row before writing any, so an unavailable key preserves the original data.
+      const encrypted = yield* Effect.sync(() =>
+        legacy.map((row) => ({
+          project: String(row.project_path),
+          ref: String(row.auth_ref),
+          password: encryptPassword(
+            String(row.password),
+            String(row.project_path),
+            String(row.auth_ref),
+          ),
+        })),
+      );
+      yield* sql.withTransaction(
+        Effect.forEach(
+          encrypted,
+          (row) => sql`
+        UPDATE environment_profile_credentials SET password = ${row.password}, credential_format = 1
+        WHERE project_path = ${row.project} AND auth_ref = ${row.ref}
+      `,
+        ),
+      );
+      yield* sql`PRAGMA wal_checkpoint(TRUNCATE)`;
+    }
   }),
 );
 

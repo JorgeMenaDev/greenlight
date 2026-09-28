@@ -9,6 +9,7 @@ import * as Option from "effect/Option";
 import * as Path from "effect/Path";
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/unstable/http";
 
+import { authenticatedRequest } from "./security.ts";
 import { ServerConfig } from "./config.ts";
 import { EvidenceStore } from "./evidence/EvidenceStore.ts";
 
@@ -27,6 +28,8 @@ export const evidenceRouteLayer = HttpRouter.add(
   "GET",
   `${EVIDENCE_ROUTE_PREFIX}*`,
   Effect.gen(function* () {
+    if (!(yield* authenticatedRequest))
+      return HttpServerResponse.text("Unauthorized", { status: 401 });
     const request = yield* HttpServerRequest.HttpServerRequest;
     const url = HttpServerRequest.toURL(request);
     if (Option.isNone(url)) {

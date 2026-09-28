@@ -54,13 +54,35 @@ export const serverUrl: string =
 export const evidenceUrl = (evidenceId: string): string =>
   `${serverUrl.replace(/\/$/, "")}/evidence/${evidenceId}`;
 
+const launchToken = new URLSearchParams(window.location.hash.slice(1)).get("token");
+if (launchToken)
+  window.history.replaceState(null, "", window.location.pathname + window.location.search);
+const establishSession = async () => {
+  const server = new URL(serverUrl);
+  if (
+    server.protocol !== "http:" ||
+    !["127.0.0.1", "localhost", "[::1]"].includes(server.hostname)
+  ) {
+    throw new Error("Greenlight requires a loopback server URL.");
+  }
+  if (!launchToken) return;
+  const response = await fetch(new URL("/session", server), {
+    method: "POST",
+    credentials: "include",
+    headers: { Authorization: `Bearer ${launchToken}` },
+  });
+  if (!response.ok) throw new Error("Open Greenlight with the current server launch link.");
+};
+
 // -- long-lived client ------------------------------------------------------
 
 const appScope = Scope.makeUnsafe();
 
-const clientPromise: Promise<GreenlightClient> = Effect.runPromise(
-  Layer.build(layerGreenlightClient(serverUrl)).pipe(Scope.provide(appScope)),
-).then((context) => Context.get(context, GreenlightRpcClient));
+const clientPromise: Promise<GreenlightClient> = establishSession()
+  .then(() =>
+    Effect.runPromise(Layer.build(layerGreenlightClient(serverUrl)).pipe(Scope.provide(appScope))),
+  )
+  .then((context) => Context.get(context, GreenlightRpcClient));
 
 // -- typed request/response surface -----------------------------------------
 
