@@ -37,7 +37,7 @@ If you change the client/server protocol, change `packages/contracts` first — 
 
 ```sh
 # Engine server (http://127.0.0.1:4773; GREENLIGHT_PORT / GREENLIGHT_HOST / GREENLIGHT_DATA_DIR to override)
-pnpm dev:server
+GREENLIGHT_WEB_ORIGIN=http://127.0.0.1:5733 node apps/server/src/bin.ts
 
 # Web UI dev server, then open http://localhost:5733/?server=http://127.0.0.1:4773
 pnpm --filter @greenlight/web dev
