@@ -10,7 +10,7 @@ import { spawn } from "node:child_process";
 import { setTimeout as delay } from "node:timers/promises";
 
 const VITE_PORT = Number(process.env.GREENLIGHT_WEB_PORT ?? 5733);
-const VITE_URL = `http://localhost:${VITE_PORT}/`;
+const VITE_URL = `http://127.0.0.1:${VITE_PORT}/`;
 const WAIT_TIMEOUT_MS = 60_000;
 const POLL_INTERVAL_MS = 250;
 
@@ -67,6 +67,8 @@ run("vite", "pnpm", [
   "--port",
   String(VITE_PORT),
   "--strictPort",
+  "--host",
+  "127.0.0.1",
 ]);
 
 const ready = await waitForVite();

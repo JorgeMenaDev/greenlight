@@ -69,11 +69,12 @@ Per-scenario token usage is also shown in the web UI run view and run history af
 ### Engine server + browser UI
 
 ```sh
-pnpm dev:server                      # engine server on http://127.0.0.1:4773
-pnpm --filter @greenlight/web dev    # web UI dev server
+GREENLIGHT_WEB_ORIGIN=http://127.0.0.1:5733 node apps/server/src/bin.ts
+# In another terminal:
+bun run --cwd apps/web dev --host 127.0.0.1
 ```
 
-Then open <http://localhost:5733/?server=http://127.0.0.1:4773>.
+Open the web UI at `http://127.0.0.1:5733/?server=http://127.0.0.1:4773#token=<launch-token>`, using the token from the server's local launch link. Use `127.0.0.1` for both origins so the session cookie stays same-site.
 
 ### Desktop app (Electron)
 
@@ -82,6 +83,18 @@ pnpm dev:desktop
 ```
 
 The desktop shell spawns its own local engine server and connects to it automatically.
+
+## Local access and saved credentials
+
+The engine binds only to loopback. Open the launch link printed by a standalone server, or let the desktop app open it. The UI exchanges the fragment token for an HttpOnly, SameSite=Strict session cookie and removes the fragment. Restarting the server invalidates its session. Host and Origin checks reject unrelated websites; RPC and evidence require authentication.
+
+Treat the launch link as a local password. For a managed standalone process, inject `GREENLIGHT_AUTH_TOKEN` as 32 random bytes in lowercase hexadecimal. When supplied, the server does not print it. Non-browser RPC clients pass the token as the optional second argument to `layerGreenlightClient`; HTTP clients use a Bearer header. `GREENLIGHT_WEB_ORIGIN` permits one exact loopback HTTP origin for a separate dev UI.
+
+Desktop saves a random credential-encryption key through Electron's OS secure store. It refuses unavailable secure storage and Linux's plaintext fallback. Standalone servers that save Basic Auth passwords need a persistent `GREENLIGHT_CREDENTIAL_KEY`, also 32 random bytes in lowercase hexadecimal, injected from a secret store. Keep the same key across launches. Both secrets are removed from the server's environment before it starts child processes.
+
+On startup, existing plaintext password rows migrate transactionally to AES-256-GCM ciphertext bound to their project path and credential reference. If the key is unavailable, migration stops without changing passwords. Usernames remain local metadata. Existing backups may still contain old plaintext; protect them separately. Keep the OS key store and encrypted key file with desktop backups, or the standalone key with standalone backups. An older binary cannot safely read migrated credentials, so restore a matching protected pre-upgrade backup if rolling back.
+
+Feature operations accept only `.feature` paths inside the opened project and reject descendant symlinks. This protects against remote file access through the API; it does not isolate a process that already controls your OS account or can race filesystem changes.
 
 ## Architecture
 
@@ -96,7 +109,7 @@ Greenlight is a pnpm monorepo built on [Effect](https://effect.website), pinned 
 | `@greenlight/web` | `apps/web` | React UI (runs in any browser, or inside the desktop shell) |
 | `@greenlight/desktop` | `apps/desktop` | Electron shell that manages a local engine server process |
 
-The design is **headless-engine-first**, mirroring the t3code reference architecture: the engine is a standalone server exposing a WebSocket RPC API (`GET /ws`), evidence over HTTP (`GET /evidence/:id`), and a health check (`GET /healthz`); in production it also serves the built web UI. The Electron app is a thin shell around the same server the web UI talks to — everything you can do in the desktop app you can also do headlessly or against a remote engine.
+The design is **headless-engine-first**, mirroring the t3code reference architecture: the engine is a standalone server exposing a WebSocket RPC API (`GET /ws`), evidence over HTTP (`GET /evidence/:id`), and a health check (`GET /healthz`); in production it also serves the built web UI. The Electron app is a thin shell around the same server the web UI talks to — the same engine serves the desktop app and authenticated local clients.
 
 ## Status & roadmap
 

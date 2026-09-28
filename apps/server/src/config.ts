@@ -7,6 +7,7 @@
  * @module config
  */
 import * as NodeOs from "node:os";
+import { randomBytes } from "node:crypto";
 
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
@@ -15,6 +16,8 @@ import * as Layer from "effect/Layer";
 import * as Path from "effect/Path";
 
 export const DEFAULT_PORT = 4773;
+const suppliedAuthToken = process.env["GREENLIGHT_AUTH_TOKEN"];
+delete process.env["GREENLIGHT_AUTH_TOKEN"];
 
 /**
  * Paths derived from the data directory.
@@ -31,6 +34,9 @@ export interface ServerConfigShape extends ServerDerivedPaths {
   readonly host: string;
   readonly dataDir: string;
   readonly version: string;
+  readonly authToken: string;
+  readonly showLaunchLink: boolean;
+  readonly allowedOrigin: string | undefined;
 }
 
 export class ServerConfig extends Context.Service<ServerConfig, ServerConfigShape>()(
@@ -53,12 +59,13 @@ export const ensureServerDirectories = Effect.fn(function* (config: ServerConfig
   const fs = yield* FileSystem.FileSystem;
   yield* Effect.all(
     [
-      fs.makeDirectory(config.dataDir, { recursive: true }),
+      fs.makeDirectory(config.dataDir, { recursive: true, mode: 0o700 }),
       fs.makeDirectory(config.evidenceDir, { recursive: true }),
       fs.makeDirectory(config.logsDir, { recursive: true }),
     ],
     { concurrency: "unbounded" },
   );
+  yield* fs.chmod(config.dataDir, 0o700);
 });
 
 const defaultDataDir = Effect.fn(function* () {
@@ -82,11 +89,35 @@ export interface MakeServerConfigOptions {
 }
 
 export const makeServerConfig = Effect.fn(function* (options: MakeServerConfigOptions) {
+  const host = options.host ?? "127.0.0.1";
+  if (!["127.0.0.1", "localhost", "::1"].includes(host)) {
+    return yield* Effect.die("Greenlight only binds to loopback addresses.");
+  }
+  const authToken = suppliedAuthToken ?? randomBytes(32).toString("hex");
+  if (!/^[a-f0-9]{64}$/.test(authToken)) {
+    return yield* Effect.die(
+      "GREENLIGHT_AUTH_TOKEN must be 32 random bytes encoded as lowercase hex.",
+    );
+  }
+  const allowedOrigin = process.env["GREENLIGHT_WEB_ORIGIN"];
+  if (allowedOrigin) {
+    const origin = new URL(allowedOrigin);
+    if (
+      origin.protocol !== "http:" ||
+      !["127.0.0.1", "localhost", "[::1]"].includes(origin.hostname) ||
+      origin.origin !== allowedOrigin
+    ) {
+      return yield* Effect.die("GREENLIGHT_WEB_ORIGIN must be an exact loopback HTTP origin.");
+    }
+  }
   const dataDir = options.dataDir ?? (yield* defaultDataDir());
   const derived = yield* deriveServerPaths(dataDir);
   const config: ServerConfigShape = {
     port: options.port ?? DEFAULT_PORT,
-    host: options.host ?? "127.0.0.1",
+    host,
+    authToken,
+    showLaunchLink: suppliedAuthToken === undefined,
+    allowedOrigin,
     dataDir,
     version: options.version,
     ...derived,

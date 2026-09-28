@@ -84,3 +84,9 @@ Five canonical triage roles map 1:1 to GitHub labels (`needs-triage`, `needs-inf
 ### Domain docs
 
 Single-context layout: `CONTEXT.md` at repo root and `docs/adr/` for ADRs. See `docs/agents/domain.md`.
+
+## Local security QA
+
+Use an isolated temporary `GREENLIGHT_DATA_DIR` and fixture project, with fake random `GREENLIGHT_AUTH_TOKEN` and `GREENLIGHT_CREDENTIAL_KEY` values. Pin an unused loopback port. Build the web UI with Bun and start `apps/server/src/bin.ts` under the required Node version. Open its fragment-token launch URL in the collaborative browser. Verify the fixture opens, the fragment disappears, the session cookie is unavailable to JavaScript, and a reload still works. Use only fixture credentials.
+
+For access-boundary changes, probe unauthenticated WebSocket/evidence routes including case, encoded and slash aliases, hostile Host/Origin, non-feature paths, traversal and descendant symlinks. For credential changes, seed a synthetic legacy row and confirm migration, decryption and rejection with the wrong key or project/reference. Capture spawned PIDs and stop only those processes after verification. Do not invoke a feature run for this QA; it starts the application's browser automation.

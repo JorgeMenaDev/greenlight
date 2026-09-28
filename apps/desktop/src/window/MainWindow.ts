@@ -20,10 +20,13 @@ const WINDOW_BACKGROUND_COLOR = "#111111";
 const isDesktopDev = (): boolean => process.env["GREENLIGHT_DESKTOP_DEV"] === "1";
 
 const resolveRendererUrl = (backendUrl: string): string => {
+  const backend = new URL(backendUrl);
   const devServerUrl = process.env["VITE_DEV_SERVER_URL"];
-  return devServerUrl !== undefined && devServerUrl.length > 0
-    ? `${devServerUrl}?server=${encodeURIComponent(backendUrl)}`
-    : backendUrl;
+  if (!devServerUrl) return backendUrl;
+  const renderer = new URL(devServerUrl);
+  renderer.searchParams.set("server", backend.origin);
+  renderer.hash = backend.hash;
+  return renderer.toString();
 };
 
 export interface MainWindowShape {

@@ -15,6 +15,7 @@ import * as Layer from "effect/Layer";
 import { HttpRouter, HttpServer } from "effect/unstable/http";
 
 import { BrowserServiceLive } from "./browser/BrowserService.ts";
+import { securityLayer, sessionRoutes } from "./security.ts";
 import { ServerConfig } from "./config.ts";
 import { CopilotServiceLive } from "./copilot/CopilotService.ts";
 import { EnvironmentProfileServiceLive } from "./environment/EnvironmentProfileService.ts";
@@ -30,6 +31,8 @@ import { evidenceRouteLayer, healthzRouteLayer, staticRouteLayer } from "./http.
 import { websocketRpcRouteLayer } from "./ws.ts";
 
 export const makeRoutesLayer = Layer.mergeAll(
+  securityLayer,
+  sessionRoutes,
   healthzRouteLayer,
   evidenceRouteLayer,
   websocketRpcRouteLayer,
@@ -42,7 +45,13 @@ const logListeningLayer = Layer.effectDiscard(
     const server = yield* HttpServer.HttpServer;
     const address = server.address;
     if (typeof address !== "string" && "port" in address) {
-      yield* Effect.logInfo(`Greenlight server listening on http://${config.host}:${address.port}`);
+      const host = config.host === "::1" ? "[::1]" : config.host;
+      yield* Effect.logInfo(`Greenlight server listening on http://${host}:${address.port}`);
+      if (config.showLaunchLink) {
+        process.stderr.write(
+          `Open Greenlight: http://${host}:${address.port}/#token=${config.authToken}\n`,
+        );
+      }
     }
   }),
 );

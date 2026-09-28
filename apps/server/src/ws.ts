@@ -16,7 +16,7 @@ import {
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Stream from "effect/Stream";
-import { HttpRouter } from "effect/unstable/http";
+import { HttpRouter, HttpServerResponse } from "effect/unstable/http";
 import { RpcSerialization, RpcServer } from "effect/unstable/rpc";
 
 import { BrowserService } from "./browser/BrowserService.ts";
@@ -28,6 +28,7 @@ import { RunManager } from "./engine/RunManager.ts";
 import { RunEventBus } from "./engine/RunEventBus.ts";
 import { RunStore } from "./persistence/RunStore.ts";
 import { EvidenceStore } from "./evidence/EvidenceStore.ts";
+import { authenticatedRequest } from "./security.ts";
 import { ServerConfig } from "./config.ts";
 
 const makeWsRpcLayer = WsRpcGroup.toLayer(
@@ -190,6 +191,8 @@ export const websocketRpcRouteLayer = HttpRouter.add(
   "GET",
   "/ws",
   Effect.gen(function* () {
+    if (!(yield* authenticatedRequest))
+      return HttpServerResponse.text("Unauthorized", { status: 401 });
     const rpcWebSocketHttpEffect = yield* RpcServer.toHttpEffectWebsocket(WsRpcGroup, {
       disableTracing: true,
     }).pipe(Effect.provide(makeWsRpcLayer.pipe(Layer.provideMerge(RpcSerialization.layerJson))));

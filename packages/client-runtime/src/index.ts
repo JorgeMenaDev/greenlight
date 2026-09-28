@@ -49,6 +49,8 @@ const resolveWsUrl = (rawUrl: string): string => {
     throw new Error(`Unsupported websocket transport URL protocol: ${resolved.protocol}`);
   }
   resolved.pathname = "/ws";
+  resolved.search = "";
+  resolved.hash = "";
   return resolved.toString();
 };
 
@@ -57,7 +59,7 @@ const resolveWsUrl = (rawUrl: string): string => {
  *
  * @param url - The server base URL (http(s):// or ws(s)://); the /ws path is appended.
  */
-export const layerWsProtocol = (url: string) =>
+export const layerWsProtocol = (url: string, token?: string) =>
   Layer.effect(
     RpcClient.Protocol,
     RpcClient.makeProtocolSocket({
@@ -66,7 +68,9 @@ export const layerWsProtocol = (url: string) =>
   ).pipe(
     Layer.provide(
       Layer.mergeAll(
-        Socket.layerWebSocket(resolveWsUrl(url)).pipe(Layer.provide(webSocketConstructorLayer)),
+        Socket.layerWebSocket(resolveWsUrl(url), {
+          protocols: token ? [`greenlight.${token}`] : undefined,
+        }).pipe(Layer.provide(webSocketConstructorLayer)),
         RpcSerialization.layerJson,
       ),
     ),
@@ -78,5 +82,7 @@ export const layerWsProtocol = (url: string) =>
  *
  * @param url - The server base URL (http(s):// or ws(s)://).
  */
-export const layerGreenlightClient = (url: string) =>
-  Layer.effect(GreenlightRpcClient, makeGreenlightClient).pipe(Layer.provide(layerWsProtocol(url)));
+export const layerGreenlightClient = (url: string, token?: string) =>
+  Layer.effect(GreenlightRpcClient, makeGreenlightClient).pipe(
+    Layer.provide(layerWsProtocol(url, token)),
+  );

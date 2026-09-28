@@ -15,6 +15,9 @@
  */
 import * as NodeChildProcess from "node:child_process";
 import * as NodePath from "node:path";
+import { randomBytes } from "node:crypto";
+import { mkdirSync, existsSync, readFileSync, writeFileSync, chmodSync } from "node:fs";
+import { safeStorage } from "electron";
 
 import * as Context from "effect/Context";
 import * as Data from "effect/Data";
@@ -171,10 +174,41 @@ const make = Effect.gen(function* () {
   );
   const backendUrl = `http://127.0.0.1:${port}`;
   const dataDir = yield* electronApp.getPath("userData");
+  yield* electronApp.whenReady;
+  const authToken = randomBytes(32).toString("hex");
+  const credentialKey = yield* Effect.try({
+    try: () => {
+      if (
+        !safeStorage.isEncryptionAvailable() ||
+        (process.platform === "linux" && safeStorage.getSelectedStorageBackend() === "basic_text")
+      ) {
+        throw new Error("The OS secure credential store is unavailable.");
+      }
+      mkdirSync(dataDir, { recursive: true, mode: 0o700 });
+      const keyFile = NodePath.join(dataDir, "credential-key.enc");
+      if (!existsSync(keyFile)) {
+        writeFileSync(keyFile, safeStorage.encryptString(randomBytes(32).toString("hex")), {
+          mode: 0o600,
+          flag: "wx",
+        });
+      }
+      chmodSync(keyFile, 0o600);
+      return safeStorage.decryptString(readFileSync(keyFile));
+    },
+    catch: () =>
+      new BackendStartupError({
+        message: "Could not unlock the OS credential store. No saved credentials were changed.",
+      }),
+  });
   const firstReady = yield* Deferred.make<void, BackendStartupError>();
 
   const command = resolveBackendCommand();
   const env: Record<string, string> = {
+    GREENLIGHT_AUTH_TOKEN: authToken,
+    GREENLIGHT_CREDENTIAL_KEY: credentialKey,
+    ...(process.env["VITE_DEV_SERVER_URL"]
+      ? { GREENLIGHT_WEB_ORIGIN: new URL(process.env["VITE_DEV_SERVER_URL"]).origin }
+      : {}),
     GREENLIGHT_PORT: String(port),
     GREENLIGHT_HOST: "127.0.0.1",
     GREENLIGHT_DATA_DIR: dataDir,
@@ -225,7 +259,7 @@ const make = Effect.gen(function* () {
   yield* Effect.forkIn(supervise, scope);
 
   return BackendManager.of({
-    backendUrl,
+    backendUrl: `${backendUrl}/#token=${authToken}`,
     awaitReady: Deferred.await(firstReady),
   });
 });

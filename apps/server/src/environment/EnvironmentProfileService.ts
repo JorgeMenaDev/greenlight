@@ -2,7 +2,7 @@
  * EnvironmentProfileService - project-scoped run targets and local credentials.
  *
  * Environment profiles are non-secret project files. Local Basic Auth
- * credentials stay in the app database and are keyed by project + auth ref.
+ * credentials are encrypted in the app database and are keyed by project + auth ref.
  *
  * @module EnvironmentProfileService
  */
@@ -29,6 +29,7 @@ import {
   type RunTarget,
 } from "@greenlight/contracts";
 
+import { encryptPassword, decryptPassword } from "./credentialEncryption.ts";
 import { ProjectService } from "../project/ProjectService.ts";
 
 const PROFILES_DIR = ".greenlight";
@@ -308,10 +309,14 @@ export const make = Effect.gen(function* () {
       `.pipe(Effect.orDie);
       const first = rows[0];
       if (first === undefined) return undefined;
-      return {
-        username: String(first.username),
-        password: String(first.password),
-      };
+      const password = yield* Effect.try({
+        try: () => decryptPassword(String(first.password), root, cleaned),
+        catch: () =>
+          new EnvironmentProfileError({
+            detail: "Could not unlock saved credentials. Check the secure store.",
+          }),
+      });
+      return { username: String(first.username), password };
     });
 
   const saveLocalCredentials: EnvironmentProfileServiceShape["saveLocalCredentials"] = (
@@ -328,14 +333,23 @@ export const make = Effect.gen(function* () {
           }),
         );
       }
+      const password = yield* Effect.try({
+        try: () => encryptPassword(credentials.password, root, cleaned),
+        catch: () =>
+          new EnvironmentProfileError({
+            detail:
+              "Saved credentials require a secure credential key. Use the desktop app or configure GREENLIGHT_CREDENTIAL_KEY.",
+          }),
+      });
       const now = DateTime.formatIso(yield* DateTime.now);
       yield* sql`
         INSERT INTO environment_profile_credentials
-          (project_path, auth_ref, username, password, updated_at)
-        VALUES (${root}, ${cleaned}, ${credentials.username}, ${credentials.password}, ${now})
+          (project_path, auth_ref, username, password, updated_at, credential_format)
+        VALUES (${root}, ${cleaned}, ${credentials.username}, ${password}, ${now}, 1)
         ON CONFLICT (project_path, auth_ref) DO UPDATE SET
           username = excluded.username,
           password = excluded.password,
+          credential_format = 1,
           updated_at = excluded.updated_at
       `.pipe(Effect.orDie);
     });

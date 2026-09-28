@@ -87,11 +87,36 @@ export const make = Effect.gen(function* () {
 
   const resolveInside = (root: string, relativePath: string) =>
     Effect.gen(function* () {
-      const resolved = path.resolve(root, relativePath);
-      if (resolved !== root && !resolved.startsWith(root + path.sep)) {
+      const canonicalRoot = yield* fs
+        .realPath(root)
+        .pipe(
+          Effect.mapError(
+            () =>
+              new FeatureIoError({ path: relativePath, detail: "Project folder is unavailable." }),
+          ),
+        );
+      const resolved = path.resolve(canonicalRoot, relativePath);
+      if (
+        path.isAbsolute(relativePath) ||
+        !relativePath.endsWith(".feature") ||
+        relativePath.includes("\0") ||
+        !resolved.startsWith(canonicalRoot + path.sep)
+      ) {
         return yield* Effect.fail(
           new FeatureIoError({ path: relativePath, detail: "Path escapes the project folder." }),
         );
+      }
+      let part = canonicalRoot;
+      for (const segment of path.relative(canonicalRoot, resolved).split(path.sep)) {
+        part = path.join(part, segment);
+        if ((yield* fs.readLink(part).pipe(Effect.option))._tag === "Some") {
+          return yield* Effect.fail(
+            new FeatureIoError({
+              path: relativePath,
+              detail: "Symbolic links are not feature files.",
+            }),
+          );
+        }
       }
       return resolved;
     });
@@ -112,6 +137,7 @@ export const make = Effect.gen(function* () {
             );
           for (const name of names) {
             const fullPath = path.join(dir, name);
+            if ((yield* fs.readLink(fullPath).pipe(Effect.option))._tag === "Some") continue;
             const info = yield* fs.stat(fullPath).pipe(Effect.option);
             if (info._tag === "None") continue;
             if (info.value.type === "Directory") {
