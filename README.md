@@ -86,7 +86,7 @@ The desktop shell spawns its own local engine server and connects to it automati
 
 ## Local access and saved credentials
 
-The engine binds only to loopback. Open the launch link printed by a standalone server, or let the desktop app open it. The UI exchanges the fragment token for an HttpOnly, SameSite=Strict session cookie and removes the fragment. Restarting the server invalidates its session. Host and Origin checks reject unrelated websites; RPC and evidence require authentication.
+The engine binds only to loopback. Open the launch link printed by a standalone server, or let the desktop app open it. The UI exchanges the fragment token for an HttpOnly, SameSite=Strict session cookie and removes the fragment. Restarting a standalone server with a generated token invalidates its session. A configured token stays valid until it is rotated. Host and Origin checks reject unrelated websites; RPC and evidence require authentication.
 
 Treat the launch link as a local password. For a managed standalone process, inject `GREENLIGHT_AUTH_TOKEN` as 32 random bytes in lowercase hexadecimal. When supplied, the server does not print it. Non-browser RPC clients pass the token as the optional second argument to `layerGreenlightClient`; HTTP clients use a Bearer header. `GREENLIGHT_WEB_ORIGIN` permits one exact loopback HTTP origin for a separate dev UI.
 
